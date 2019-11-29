@@ -3012,6 +3012,9 @@ static void
 bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 		struct bfq_queue *bfqq, struct bfq_queue *new_bfqq)
 {
+	struct task_struct *item;
+	struct hlist_node *n;
+
 	bfq_log_bfqq(bfqd, bfqq, "merging with queue %lu",
 		(unsigned long)new_bfqq->pid);
 	BFQ_BUG_ON(bfqq->bic && bfqq->bic == new_bfqq->bic);
@@ -3090,6 +3093,12 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	 */
 	new_bfqq->pid = -1;
 	bfqq->bic = NULL;
+
+	// TODO Come concatenare le lista dei task delle code da mergiare
+	// e quali sono le code da mergiare
+	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
+		hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
+
 	/* release process reference to bfqq */
 	bfq_put_queue(bfqq);
 }
@@ -5485,6 +5494,13 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	bfq_put_cooperator(bfqq);
 
 	bfq_put_queue(bfqq); /* release process reference */
+	/*
+	 * FIXME Controllare se bugon funziona
+	 * Controlliamo con bugon se il task è in una coda.
+	 * Nel caso, lo rimuoviamo dalla coda
+	 */
+	BFQ_BUG_ON(!hlist_unhashed(&current->task_list_node)); 
+	hlist_del_init(&current->task_list_node);	
 }
 
 static void bfq_exit_icq_bfqq(struct bfq_io_cq *bic, bool is_sync)
@@ -5637,7 +5653,13 @@ static void bfq_init_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 
 	bfq_mark_bfqq_IO_bound(bfqq);
 
-	bfqq->pid = pid;
+	bfqq->pid = pid; // TODO change
+
+	/*
+	 * FIXME 
+	 * Aggiungiamo il task corrente (current) alla task_list nella coda.
+	*/
+	hlist_add_head(&current->task_list_node, &bfqq->task_list);
 
 	/* Tentative initial value to trade off between thr and lat */
 	bfqq->max_budget = (2 * bfq_max_budget(bfqd)) / 3;
@@ -7117,6 +7139,36 @@ static void bfq_init_root_group(struct bfq_group *root_group,
 	root_group->sched_data.bfq_class_idle_last_service = jiffies;
 }
 
+#if defined(CONFIG_BFQ_GROUP_IOSCHED) && defined(CONFIG_BLK_CGROUP_IOCOST)
+static bool bfq_enabled = false;
+
+static void bfq_enable(void)
+{
+	static DEFINE_MUTEX(bfq_enable_mutex);
+
+	mutex_lock(&bfq_enable_mutex);
+	if (!bfq_enabled) {
+		pr_info("bfq-iosched: Overriding iocost\n");
+		blkcg_policy_unregister(&blkcg_policy_iocost);
+		cgroup_add_dfl_cftypes(&io_cgrp_subsys, bfq_blkg_files);
+		bfq_enabled = true;
+	}
+	mutex_unlock(&bfq_enable_mutex);
+}
+
+static void __exit bfq_disable(void)
+{
+	if (bfq_enabled) {
+		pr_info("bfq-iosched: Restoring iocost\n");
+		cgroup_rm_cftypes(bfq_blkg_files);
+		blkcg_policy_register(&blkcg_policy_iocost);
+	}
+}
+#else
+static void bfq_enable(void) {}
+static void __exit bfq_disable(void) {}
+#endif
+
 static int bfq_init_queue(struct request_queue *q, struct elevator_type *e)
 {
 	struct bfq_data *bfqd;
@@ -7241,6 +7293,7 @@ static int bfq_init_queue(struct request_queue *q, struct elevator_type *e)
 	bfq_init_entity(&bfqd->oom_bfqq.entity, bfqd->root_group);
 
 	wbt_disable_default(q);
+	bfq_enable();
 	return 0;
 
 out_free:
@@ -7646,6 +7699,7 @@ static void __exit bfq_exit(void)
 	blkcg_policy_unregister(&blkcg_policy_bfq);
 #endif
 	bfq_slab_kill();
+	bfq_disable();
 }
 
 module_init(bfq_init);

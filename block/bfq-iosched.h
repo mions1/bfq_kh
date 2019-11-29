@@ -304,7 +304,10 @@ struct bfq_queue {
 	unsigned int requests_within_timer;
 
 	/* pid of the process owning the queue, used for logging purposes */
-	pid_t pid;
+	pid_t pid;	// TODO da eliminare (?)
+
+	// TODO aggiungo lista dei tasks
+	struct hlist_head task_list;
 
 	/*
 	 * Pointer to the bfq_io_cq owning the bfq_queue, set to %NULL
