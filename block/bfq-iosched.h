@@ -957,6 +957,7 @@ void bfq_put_queue(struct bfq_queue *bfqq);
 void bfq_end_wr_async_queues(struct bfq_data *bfqd, struct bfq_group *bfqg);
 void bfq_schedule_dispatch(struct bfq_data *bfqd);
 void bfq_put_async_queues(struct bfq_data *bfqd, struct bfq_group *bfqg);
+pid_t bfq_get_first_task_pid(struct bfq_queue *queue);
 
 /* ------------ end of main algorithm interface -------------- */
 

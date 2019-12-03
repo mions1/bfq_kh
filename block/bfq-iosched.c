@@ -566,6 +566,9 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 	struct rb_node **p, *parent;
 	struct bfq_queue *bfqq = NULL;
 
+	struct task_struct *item;
+	struct hlist_node *n;
+
 	parent = NULL;
 	p = &root->rb_node;
 	while (*p) {
@@ -593,9 +596,13 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 	if (rb_link)
 		*rb_link = p;
 
-	bfq_log(bfqd, "%llu: returning %d",
-		(unsigned long long) sector,
-		bfqq ? bfqq->pid : 0);
+
+	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
+	{
+		bfq_log(bfqd, "%llu: returning %n",
+			(unsigned long long) sector,
+			bfqq ? &item->pid : 0);
+	}
 
 	return bfqq;
 }
@@ -1137,6 +1144,7 @@ bfq_bfqq_resume_state(struct bfq_queue *bfqq, struct bfq_data *bfqd,
 	}
 }
 
+// conta quanti riferimenti ho alla coda
 static int bfqq_process_refs(struct bfq_queue *bfqq)
 {
 	int process_refs, io_refs;
@@ -3094,10 +3102,16 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	new_bfqq->pid = -1;
 	bfqq->bic = NULL;
 
-	// TODO Come concatenare le lista dei task delle code da mergiare
-	// e quali sono le code da mergiare
-	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
+	// DONE
+	/*
+	 * delete task_list_node from one list to add it to another list
+	 * to merge two task_list into one
+	 */
+	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
+	{
+		hlist_del_init(&item->task_list_node);
 		hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
+	}
 
 	/* release process reference to bfqq */
 	bfq_put_queue(bfqq);
@@ -5494,10 +5508,14 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	bfq_put_cooperator(bfqq);
 
 	bfq_put_queue(bfqq); /* release process reference */
+
+	// DONE
 	/*
-	 * FIXME Controllare se bugon funziona
-	 * Controlliamo con bugon se il task è in una coda.
-	 * Nel caso, lo rimuoviamo dalla coda
+	 * TODO Controllare se bugon funziona
+	 * 
+	 * with bugon check if task is in a queue (it have to)
+	 * if it isn't in a queue, there is a big issue, so kernel OPS
+	 * else, remove current task from task_list
 	 */
 	BFQ_BUG_ON(!hlist_unhashed(&current->task_list_node)); 
 	hlist_del_init(&current->task_list_node);	
@@ -5655,9 +5673,9 @@ static void bfq_init_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 
 	bfqq->pid = pid; // TODO change
 
+	// TODO
 	/*
-	 * FIXME 
-	 * Aggiungiamo il task corrente (current) alla task_list nella coda.
+	 * Add current task to task_list in bfqq
 	*/
 	hlist_add_head(&current->task_list_node, &bfqq->task_list);
 
@@ -6668,6 +6686,9 @@ static void bfq_finish_requeue_request(struct request *rq)
 static struct bfq_queue *
 bfq_split_bfqq(struct bfq_io_cq *bic, struct bfq_queue *bfqq)
 {
+	struct task_struct *item;
+	struct hlist_node *n;
+
 	bfq_log_bfqq(bfqq->bfqd, bfqq, "splitting queue");
 
 	if (bfqq_process_refs(bfqq) == 1) {
@@ -6675,6 +6696,20 @@ bfq_split_bfqq(struct bfq_io_cq *bic, struct bfq_queue *bfqq)
 		bfq_clear_bfqq_coop(bfqq);
 		bfq_clear_bfqq_split_coop(bfqq);
 		return bfqq;
+	}
+
+	// DONE
+	// TODO elimina task dalla coda con for_each
+	/*
+	 * delete current task from queue itereting on task_list
+	 */
+	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
+	{
+		if (item == current)
+		{
+			hlist_del_init(&item->task_list_node);
+			break;
+		}
 	}
 
 	bic_set_bfqq(bic, NULL, 1);
@@ -7708,3 +7743,15 @@ module_exit(bfq_exit);
 MODULE_AUTHOR("Paolo Valente");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MQ Budget Fair Queueing I/O Scheduler");
+
+/* get the pid of the first task in task_list of bfqq */
+pid_t bfq_get_first_task_pid(struct bfq_queue *bfqq) 
+{
+	struct task_struct *item;
+	struct hlist_node *n;
+
+	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
+		return &item->pid;
+
+	return NULL;
+}
