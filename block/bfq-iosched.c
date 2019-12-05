@@ -5549,7 +5549,8 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	 * if it isn't in a queue, there is a big issue, so kernel OPS
 	 * else, remove current task from task_list
 	 */
-	bfq_log_bfqg(bfqd, bfqq, "CHECKING COSTINCENCY IN TASK LIST %p, %d", bfqq, bfqq->ref)
+	//bfq_log_bfqq(bfqd, bfqq, "CHECKING COSTINCENCY IN TASK LIST %p, %d", bfqq, bfqq->ref)
+	printk("CHECKING CONSINSTENCY IN TASK LIST \n");
 	BFQ_BUG_ON(!hlist_unhashed(&current->task_list_node)); 
 	hlist_del_init(&current->task_list_node);	
 }
