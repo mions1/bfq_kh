@@ -596,14 +596,14 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 	if (rb_link)
 		*rb_link = p;
 
-
+	/*
 	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
 	{
 		bfq_log(bfqd, "%llu: returning %n",
 			(unsigned long long) sector,
 			bfqq ? &item->pid : 0);
 	}
-
+	*/
 	return bfqq;
 }
 
