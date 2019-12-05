@@ -2173,7 +2173,7 @@ static void bfq_add_request(struct request *rq)
 				bfq_clear_bfqq_has_waker(bfqq);
 				bfq_log_bfqq(bfqd, bfqq,
 					     "tentative waker: %d",
-					     bfqq->waker_bfqq->pid);
+					     bfq_get_first_task_pid(bfqq->waker_bfqq));
 			} else if (bfqd->last_completed_rq_bfqq ==
 				   bfqq->waker_bfqq &&
 				   !bfq_bfqq_has_waker(bfqq)) {
@@ -2183,7 +2183,7 @@ static void bfq_add_request(struct request *rq)
 				 */
 				bfq_mark_bfqq_has_waker(bfqq);
 				bfq_log_bfqq(bfqd, bfqq, "has waker set to %d",
-					     bfqq->waker_bfqq->pid);
+					     bfq_get_first_task_pid(bfqq->waker_bfqq));
 			}
 		}
 
@@ -2760,6 +2760,9 @@ bfq_setup_merge(struct bfq_queue *bfqq, struct bfq_queue *new_bfqq)
 	int process_refs, new_process_refs;
 	struct bfq_queue *__bfqq;
 
+	struct task_struct *item;
+	struct hlist_node *n;
+
 	/*
 	 * If there are no process references on the new_bfqq, then it is
 	 * unsafe to follow the ->new_bfqq chain as other bfqq's in the chain
@@ -2785,8 +2788,11 @@ bfq_setup_merge(struct bfq_queue *bfqq, struct bfq_queue *new_bfqq)
 	if (process_refs == 0 || new_process_refs == 0)
 		return NULL;
 
-	bfq_log_bfqq(bfqq->bfqd, bfqq, "scheduling merge with queue %d",
-		new_bfqq->pid);
+	hlist_for_each_entry_safe(item, n, &new_bfqq->task_list, task_list_node)
+	{
+		bfq_log_bfqq(bfqq->bfqd, bfqq, "scheduling merge with queue %d",
+			&item->pid);
+	}
 
 	/*
 	 * Merging is just a redirection: the requests of the process
@@ -2816,10 +2822,17 @@ bfq_setup_merge(struct bfq_queue *bfqq, struct bfq_queue *new_bfqq)
 static bool bfq_may_be_close_cooperator(struct bfq_queue *bfqq,
 					struct bfq_queue *new_bfqq)
 {
+
+	struct task_struct *item;
+	struct hlist_node *n;
+
 	if (bfq_too_late_for_merging(new_bfqq)) {
-		bfq_log_bfqq(bfqq->bfqd, bfqq,
-			     "too late for bfq%d to be merged",
-				new_bfqq->pid);
+		hlist_for_each_entry_safe(item, n, &new_bfqq->task_list, task_list_node)
+		{
+			bfq_log_bfqq(bfqq->bfqd, bfqq,
+					"too late for bfq%d to be merged",
+					&item->pid);
+		}
 		return false;
 	}
 
@@ -3023,8 +3036,11 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	struct task_struct *item;
 	struct hlist_node *n;
 
-	bfq_log_bfqq(bfqd, bfqq, "merging with queue %lu",
-		(unsigned long)new_bfqq->pid);
+	hlist_for_each_entry_safe(item, n, &new_bfqq->task_list, task_list_node)
+	{
+		bfq_log_bfqq(bfqd, bfqq, "merging with queue %lu",
+			(unsigned long)&item->pid);
+	}
 	BFQ_BUG_ON(bfqq->bic && bfqq->bic == new_bfqq->bic);
 	/* Save weight raising and idle window of the merged queues */
 	bfq_bfqq_save_state(bfqq);
@@ -3055,10 +3071,14 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 		}
 
 		new_bfqq->entity.prio_changed = 1;
-		bfq_log_bfqq(bfqd, new_bfqq,
-			     "wr start after merge with %d, rais_max_time %u",
-			     bfqq->pid,
-			     jiffies_to_msecs(bfqq->wr_cur_max_time));
+	
+		hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
+		{
+			bfq_log_bfqq(bfqd, new_bfqq,
+					"wr start after merge with %d, rais_max_time %u",
+					&item->pid,
+					jiffies_to_msecs(bfqq->wr_cur_max_time));
+		}
 	}
 
 	if (bfqq->wr_coeff > 1) { /* bfqq has given its wr to new_bfqq */
@@ -3099,6 +3119,7 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	 * We mark such a queue with a pid -1, and then print SHARED instead of
 	 * a pid in logging messages.
 	 */
+	// TODO: Da eliminare
 	new_bfqq->pid = -1;
 	bfqq->bic = NULL;
 
@@ -4783,6 +4804,9 @@ static struct bfq_queue *bfq_select_queue(struct bfq_data *bfqd)
 	struct request *next_rq;
 	enum bfqq_expiration reason = BFQQE_BUDGET_TIMEOUT;
 
+	struct task_struct *item;
+	struct hlist_node *n;
+
 	bfqq = bfqd->in_service_queue;
 	if (!bfqq)
 		goto new_queue;
@@ -4964,9 +4988,12 @@ check_queue:
 		    icq_to_bic(async_bfqq->next_rq->elv.icq) == bfqq->bic &&
 		    bfq_serv_to_charge(async_bfqq->next_rq, async_bfqq) <=
 		    bfq_bfqq_budget_left(async_bfqq)) {
-			bfq_log_bfqq(bfqd, bfqq,
-				     "choosing directly the async queue %d",
-				     bfqq->bic->bfqq[0]->pid);
+			hlist_for_each_entry_safe(item, n, &bfqq->bic->bfqq[0]->task_list, task_list_node)
+			{
+				bfq_log_bfqq(bfqd, bfqq,
+						"choosing directly the async queue %d",
+						&item->pid);
+			}
 			BUG_ON(bfqq->bic->bfqq[0] == bfqq);
 			bfqq = bfqq->bic->bfqq[0];
 			bfq_log_bfqq(bfqd, bfqq,
@@ -4980,7 +5007,7 @@ check_queue:
 			) {
 			bfq_log_bfqq(bfqd, bfqq,
 				     "choosing directly the waker queue %d",
-				     bfqq->waker_bfqq->pid);
+				     bfq_get_first_task_pid(bfqq->waker_bfqq));
 			BUG_ON(bfqq->waker_bfqq == bfqq);
 			bfqq = bfqq->waker_bfqq;
 			bfq_log_bfqq(bfqd, bfqq,
@@ -4996,10 +5023,15 @@ check_queue:
 				     !bfq_bfqq_has_short_ttime(bfqq));
 			new_bfqq = bfq_choose_bfqq_for_injection(bfqd);
 			BUG_ON(new_bfqq == bfqq);
-			if (new_bfqq)
-				bfq_log_bfqq(bfqd, bfqq,
-					"chosen the queue %d for injection",
-					new_bfqq->pid);
+			if (new_bfqq) 
+			{
+				hlist_for_each_entry_safe(item, n, &new_bfqq->task_list, task_list_node)
+				{
+					bfq_log_bfqq(bfqd, bfqq,
+						"chosen the queue %d for injection",
+						&item->pid);
+				}
+			}
 			bfqq = new_bfqq;
 		} else {
 			bfqq = NULL;
