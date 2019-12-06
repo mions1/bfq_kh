@@ -2174,7 +2174,7 @@ static void bfq_add_request(struct request *rq)
 				bfq_clear_bfqq_has_waker(bfqq);
 				bfq_log_bfqq(bfqd, bfqq,
 					     "tentative waker: %d",
-					     bfq_get_first_task_pid(bfqq->waker_bfqq) ? bfq_get_first_task_pid(bfqq->waker_bfqq) != NULL : 0 );
+					     bfq_get_first_task_pid(bfqq->waker_bfqq));
 			} else if (bfqd->last_completed_rq_bfqq ==
 				   bfqq->waker_bfqq &&
 				   !bfq_bfqq_has_waker(bfqq)) {
@@ -2184,7 +2184,7 @@ static void bfq_add_request(struct request *rq)
 				 */
 				bfq_mark_bfqq_has_waker(bfqq);
 				bfq_log_bfqq(bfqd, bfqq, "has waker set to %d",
-					     bfq_get_first_task_pid(bfqq->waker_bfqq) ? bfq_get_first_task_pid(bfqq->waker_bfqq) != NULL : 0);
+					     bfq_get_first_task_pid(bfqq->waker_bfqq));
 			}
 		}
 
@@ -7785,8 +7785,11 @@ pid_t bfq_get_first_task_pid(struct bfq_queue *bfqq)
 	struct task_struct *item;
 	struct hlist_node *n;
 
-	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
+	printk("PRINTING PID");
+	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) {
+		printk("CURRENT PID %d", &item->pid);
 		return &item->pid;
+	}
 
-	return NULL;
+	return 0;
 }
