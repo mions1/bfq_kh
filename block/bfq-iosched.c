@@ -2172,7 +2172,7 @@ static void bfq_add_request(struct request *rq)
 				bfq_clear_bfqq_has_waker(bfqq);
 				bfq_log_bfqq(bfqd, bfqq,
 					     "tentative waker: %d",
-					     bfq_get_first_task_pid(bfqq->waker_bfqq));
+					     bfq_get_first_task_pid(bfqq->waker_bfqq) ? bfq_get_first_task_pid(bfqq->waker_bfqq) != NULL : 0 );
 			} else if (bfqd->last_completed_rq_bfqq ==
 				   bfqq->waker_bfqq &&
 				   !bfq_bfqq_has_waker(bfqq)) {
@@ -2182,7 +2182,7 @@ static void bfq_add_request(struct request *rq)
 				 */
 				bfq_mark_bfqq_has_waker(bfqq);
 				bfq_log_bfqq(bfqd, bfqq, "has waker set to %d",
-					     bfq_get_first_task_pid(bfqq->waker_bfqq));
+					     bfq_get_first_task_pid(bfqq->waker_bfqq) ? bfq_get_first_task_pid(bfqq->waker_bfqq) != NULL : 0);
 			}
 		}
 
