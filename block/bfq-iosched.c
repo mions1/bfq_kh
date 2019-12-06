@@ -599,7 +599,7 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
 	{
 		// TODO controlla se va
-		BFQ_BUG_ON(&item->pid != NULL); 
+		BFQ_BUG_ON(item == 0 || item == NULL); 
 		bfq_log(bfqd, "%llu: returning %n",
 			(unsigned long long) sector,
 			bfqq ? &item->pid : 0);
@@ -7785,9 +7785,7 @@ pid_t bfq_get_first_task_pid(struct bfq_queue *bfqq)
 	struct task_struct *item;
 	struct hlist_node *n;
 
-	printk("PRINTING PID");
 	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) {
-		printk("CURRENT PID %d", &item->pid);
 		return &item->pid;
 	}
 
