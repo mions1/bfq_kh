@@ -5559,7 +5559,7 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	// 		break;
 	// 	}
 	// }
-	BFQ_BUG_ON(hlist_unhashed(current)); 
+	BFQ_BUG_ON(hlist_unhashed(&current)); 
 	hlist_del_init(&current->task_list_node);	
 
 	bfq_put_cooperator(bfqq);
