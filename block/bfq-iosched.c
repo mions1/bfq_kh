@@ -599,19 +599,15 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 		*rb_link = p;
 
 	if (bfqq != NULL && &bfqq->task_list != NULL) {
-		printk("SONO NEL IF \n");
 		hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
 		{
 			// TODO controlla se va
-			printk("SONO NEL FOREACH \n");
 			BFQ_BUG_ON(item == 0 || item == NULL); 
 			bfq_log(bfqd, "%llu: returning %n",
 				(unsigned long long) sector,
 				bfqq ? &item->pid : 0);
 		}
 	}
-	
-	printk("USCITO DAL FOREACH \n");
 	return bfqq;
 }
 
@@ -5686,6 +5682,8 @@ static void bfq_init_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 	INIT_HLIST_NODE(&bfqq->burst_list_node);
 	INIT_HLIST_NODE(&bfqq->woken_list_node);
 	INIT_HLIST_HEAD(&bfqq->woken_list);
+	// TODO Initi bfqq->task_list
+	INIT_HLIST_HEAD(&bfqq->task_list);
 	BFQ_BUG_ON(!hlist_unhashed(&bfqq->burst_list_node));
 
 	bfqq->ref = 0;
