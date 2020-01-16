@@ -5535,9 +5535,9 @@ static void bfq_put_cooperator(struct bfq_queue *bfqq)
 static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 {
 
-	struct task_struct *item;
-	struct hlist_node *n;
-	bool task_found = false;
+	// struct task_struct *item;
+	// struct hlist_node *n;
+	// bool task_found = false;
 
 	if (bfqq == bfqd->in_service_queue) {
 		__bfq_bfqq_expire(bfqd, bfqq, BFQQE_BUDGET_TIMEOUT);
@@ -5552,27 +5552,22 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 
 	// DONE
 	/*
-	 * TODO Controllare se bugon funziona
+	 * TODO Controllare se bugon funziona - NEL CASO ELIMINA LE COSE CHE NON SERVONO
 	 * 
 	 * with bugon check if task is in a queue (it have to)
 	 * if it isn't in a queue, there is a big issue, so kernel OPS
 	 * else, remove current task from task_list
 	 */
 	//bfq_log_bfqq(bfqd, bfqq, "CHECKING COSTINCENCY IN TASK LIST %p, %d", bfqq, bfqq->ref)
-	printk("CHECKING CONSINSTENCY IN TASK LIST \n");
-	if (&bfqq->pid == -1) {
-		printk("THIS IS A MOTHERFUCKING BURST LIST");
-	}	
-	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
-	{
-		printk("SONO NEL FOR \n");
-		if (item == current)
-		{
-			printk("TASK FOUND \n");
-			task_found = true;
-			break;
-		}
-	}
+	// printk("CHECKING CONSINSTENCY IN TASK LIST \n");
+	// hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
+	// {
+	// 	if (item == current)
+	// 	{
+	// 		task_found = true;
+	// 		break;
+	// 	}
+	// }
 	hlist_del_init(&current->task_list_node);	
 	//BFQ_BUG_ON(!task_found);
 	//BFQ_BUG_ON(hlist_unhashed(&current->task_list_node)); 
