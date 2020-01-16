@@ -5684,6 +5684,8 @@ static void bfq_init_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 	INIT_HLIST_HEAD(&bfqq->woken_list);
 	// TODO Initi bfqq->task_list
 	INIT_HLIST_HEAD(&bfqq->task_list);
+	INIT_HLIST_NODE(&current->task_list_node);
+
 	BFQ_BUG_ON(!hlist_unhashed(&bfqq->burst_list_node));
 
 	bfqq->ref = 0;
