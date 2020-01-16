@@ -593,21 +593,22 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 		bfqq = NULL;
 	}
 
-	printk("SONO PRIMA DI ret_parent \n");
+	
 	*ret_parent = parent;
-	printk("SONO PRIMA DI IF \n");
 	if (rb_link)
 		*rb_link = p;
-	printk("SONO DOPO IF \n");
 
-	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
-	{
-		// TODO controlla se va
-		printk("SONO NEL FOREACH \n");
-		BFQ_BUG_ON(item == 0 || item == NULL); 
-		bfq_log(bfqd, "%llu: returning %n",
-			(unsigned long long) sector,
-			bfqq ? &item->pid : 0);
+	if (&bfqq != NULL && &bfqq->task_list != NULL) {
+		printk("SONO NEL IF \n");
+		hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
+		{
+			// TODO controlla se va
+			printk("SONO NEL FOREACH \n");
+			BFQ_BUG_ON(item == 0 || item == NULL); 
+			bfq_log(bfqd, "%llu: returning %n",
+				(unsigned long long) sector,
+				bfqq ? &item->pid : 0);
+		}
 	}
 	
 	printk("USCITO DAL FOREACH \n");
