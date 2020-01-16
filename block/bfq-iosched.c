@@ -5556,6 +5556,9 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	 */
 	//bfq_log_bfqq(bfqd, bfqq, "CHECKING COSTINCENCY IN TASK LIST %p, %d", bfqq, bfqq->ref)
 	printk("CHECKING CONSINSTENCY IN TASK LIST \n");
+	if (&bfqq->pid == -1) {
+		printk("THIS IS A MOTHERFUCKING BURST LIST");
+	}	
 	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
 	{
 		printk("SONO NEL FOR \n");
@@ -5567,6 +5570,7 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 			break;
 		}
 	}
+
 	BFQ_BUG_ON(!task_found);
 	//BFQ_BUG_ON(hlist_unhashed(&current->task_list_node)); 
 
