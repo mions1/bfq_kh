@@ -3132,7 +3132,7 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	 * delete task_list_node from one list to add it to another list
 	 * to merge two task_list into one
 	 */
-	if (bfqq_process_refs(bfqq) > 0) {
+	if (bfqq_process_refs(bfqq) > 1) {
 		printk("------BURST LIST START-------");
 		hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
 		{
