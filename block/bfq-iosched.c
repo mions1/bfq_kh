@@ -3136,7 +3136,7 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	{
 		hlist_del_init(&item->task_list_node);
 		hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
-		printk(&item->pid);
+		printk("%i",(&item->pid));
 	}
 
 	/* release process reference to bfqq */
