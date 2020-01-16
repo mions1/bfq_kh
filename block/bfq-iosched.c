@@ -5535,6 +5535,8 @@ static void bfq_put_cooperator(struct bfq_queue *bfqq)
 static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 {
 
+	struct task_struct *item;
+	struct hlist_node *n;
 	bool task_found = false;
 
 	if (bfqq == bfqd->in_service_queue) {
