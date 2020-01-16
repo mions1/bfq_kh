@@ -5570,11 +5570,10 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 		{
 			printk("TASK FOUND \n");
 			task_found = true;
-			hlist_del_init(&current->task_list_node);	
 			break;
 		}
 	}
-
+	hlist_del_init(&current->task_list_node);	
 	//BFQ_BUG_ON(!task_found);
 	//BFQ_BUG_ON(hlist_unhashed(&current->task_list_node)); 
 }
