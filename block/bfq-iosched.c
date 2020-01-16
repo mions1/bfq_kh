@@ -593,12 +593,12 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 		bfqq = NULL;
 	}
 
-	
+
 	*ret_parent = parent;
 	if (rb_link)
 		*rb_link = p;
 
-	if (&bfqq != NULL && &bfqq->task_list != NULL) {
+	if (bfqq != NULL && &bfqq->task_list != NULL) {
 		printk("SONO NEL IF \n");
 		hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
 		{
