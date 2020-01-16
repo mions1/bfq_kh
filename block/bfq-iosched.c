@@ -563,6 +563,7 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 		     sector_t sector, struct rb_node **ret_parent,
 		     struct rb_node ***rb_link)
 {
+	printk("SONO ENTRATO IN BFQ_RQ_POS_TREE_LOOKUP \n");
 	struct rb_node **p, *parent;
 	struct bfq_queue *bfqq = NULL;
 
@@ -571,6 +572,7 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 
 	parent = NULL;
 	p = &root->rb_node;
+	printk("SONO NEL PRIMO WHILE \n");
 	while (*p) {
 		struct rb_node **n;
 
@@ -592,6 +594,7 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 		bfqq = NULL;
 	}
 
+	printk("SONO USCITO DAL WHILE \n");
 	*ret_parent = parent;
 	if (rb_link)
 		*rb_link = p;
@@ -599,12 +602,14 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
 	{
 		// TODO controlla se va
+		printk("SONO NEL FOREACH \n");
 		BFQ_BUG_ON(item == 0 || item == NULL); 
 		bfq_log(bfqd, "%llu: returning %n",
 			(unsigned long long) sector,
 			bfqq ? &item->pid : 0);
 	}
 	
+	printk("USCITO DAL FOREACH \n");
 	return bfqq;
 }
 
