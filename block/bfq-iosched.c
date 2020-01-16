@@ -5546,6 +5546,10 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 
 	bfq_log_bfqq(bfqd, bfqq, "%p, %d", bfqq, bfqq->ref);
 
+	bfq_put_cooperator(bfqq);
+
+	bfq_put_queue(bfqq); /* release process reference */
+
 	// DONE
 	/*
 	 * TODO Controllare se bugon funziona
@@ -5571,14 +5575,8 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 		}
 	}
 
-	BFQ_BUG_ON(!task_found);
+	//BFQ_BUG_ON(!task_found);
 	//BFQ_BUG_ON(hlist_unhashed(&current->task_list_node)); 
-
-	bfq_put_cooperator(bfqq);
-
-	bfq_put_queue(bfqq); /* release process reference */
-
-
 }
 
 static void bfq_exit_icq_bfqq(struct bfq_io_cq *bic, bool is_sync)
