@@ -5558,6 +5558,7 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	printk("CHECKING CONSINSTENCY IN TASK LIST \n");
 	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
 	{
+		printk("SONO NEL FOR \n");
 		if (item == current)
 		{
 			printk("TASK FOUND \n");
