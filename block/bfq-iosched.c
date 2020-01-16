@@ -5534,6 +5534,9 @@ static void bfq_put_cooperator(struct bfq_queue *bfqq)
 
 static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 {
+
+	bool task_found = false;
+
 	if (bfqq == bfqd->in_service_queue) {
 		__bfq_bfqq_expire(bfqd, bfqq, BFQQE_BUDGET_TIMEOUT);
 		bfq_schedule_dispatch(bfqd);
@@ -5551,16 +5554,17 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	 */
 	//bfq_log_bfqq(bfqd, bfqq, "CHECKING COSTINCENCY IN TASK LIST %p, %d", bfqq, bfqq->ref)
 	printk("CHECKING CONSINSTENCY IN TASK LIST \n");
-	// hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
-	// {
-	// 	if (item == current)
-	// 	{
-	// 		hlist_del_init(&item->task_list_node);
-	// 		break;
-	// 	}
-	// }
-	BFQ_BUG_ON(hlist_unhashed(&current)); 
-	hlist_del_init(&current->task_list_node);	
+	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
+	{
+		if (item == current)
+		{
+			task_found = true;
+			hlist_del_init(&current->task_list_node);	
+			break;
+		}
+	}
+	BFQ_BUG_ON(!task_found);
+	//BFQ_BUG_ON(hlist_unhashed(&current->task_list_node)); 
 
 	bfq_put_cooperator(bfqq);
 
