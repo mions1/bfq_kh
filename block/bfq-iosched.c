@@ -3044,10 +3044,8 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	{
 		bfq_log_bfqq(bfqd, bfqq, "merging with queue %lu",
 			(unsigned long)&item->pid);
-		printk(bfqd, bfqq, "merging with queue %lu",
-			(unsigned long)&item->pid);
-		printk("merging with queue %lu",
-			(unsigned long)&item->pid);
+		printk("%lu merging with queue %lu",
+			(unsigned long)&bfqq->pid, (unsigned long)&item->pid);
 	}
 	BFQ_BUG_ON(bfqq->bic && bfqq->bic == new_bfqq->bic);
 	/* Save weight raising and idle window of the merged queues */
