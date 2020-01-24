@@ -3044,6 +3044,8 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	{
 		bfq_log_bfqq(bfqd, bfqq, "merging with queue %lu",
 			(unsigned long)&item->pid);
+		printk("merging with queue %lu",
+			(unsigned long)&item->pid);
 	}
 	BFQ_BUG_ON(bfqq->bic && bfqq->bic == new_bfqq->bic);
 	/* Save weight raising and idle window of the merged queues */
@@ -3137,7 +3139,7 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	{
 		hlist_del_init(&item->task_list_node);
 		hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
-		printk(KERN_CONT "%i, ",(item->pid));
+		printk(KERN_CONT "%lu, ",(unsigned long)&item->pid);
 	}
 	printk("------BURST LIST END-------");
 
