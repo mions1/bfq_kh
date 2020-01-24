@@ -3132,12 +3132,12 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	 * delete task_list_node from one list to add it to another list
 	 * to merge two task_list into one
 	 */
-	printk("------BURST LIST START-------");
+	printk("------BURST LIST START-------\n");
 	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
 	{
 		hlist_del_init(&item->task_list_node);
 		hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
-		printk(KERN_CONT "%i",(item->pid));
+		printk(KERN_CONT "%i, ",(item->pid));
 	}
 	printk("------BURST LIST END-------");
 
@@ -6774,10 +6774,10 @@ bfq_split_bfqq(struct bfq_io_cq *bic, struct bfq_queue *bfqq)
 	}
 
 	// TODO lista pid dopo split
-	printk("------BURST LIST START AFTER SPLIT-------");
+	printk("------BURST LIST START AFTER SPLIT-------\n");
 	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
 	{
-		printk(KERN_CONT "%i",(item->pid));
+		printk(KERN_CONT "%i, ",(item->pid));
 	}
 	printk("------BURST LIST END-------");
 
