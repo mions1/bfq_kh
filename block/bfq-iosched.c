@@ -5545,9 +5545,9 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	// bool task_found = false;
 
 	if (hlist_unhashed(&current->task_list_node)) {
-		printk("LISTA UNASHED, PID: %d", &current->pid);
+		printk("LISTA UNASHED, PID: %d", current->pid);
 	}
-	
+
 	if (bfqq == bfqd->in_service_queue) {
 		__bfq_bfqq_expire(bfqd, bfqq, BFQQE_BUDGET_TIMEOUT);
 		bfq_schedule_dispatch(bfqd);
