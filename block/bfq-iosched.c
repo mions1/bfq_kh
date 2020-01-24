@@ -3138,13 +3138,16 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	//new_bfqq->pid = -1;
 	bfqq->bic = NULL;
 
+	/* release process reference to bfqq */
+	bfq_put_queue(bfqq);
+
 	// DONE
 	/*
 	 * delete task_list_node from one list to add it to another list
 	 * to merge two task_list into one
 	 */
-	printk("------BURST LIST START (%i)-------\n", bfqq->allocated);
-	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
+	printk("------BURST LIST START (%i)-------\n", new_bfqq->allocated);
+	hlist_for_each_entry_safe(item, n, &new_bfqq->task_list, task_list_node) 
 	{
 		hlist_del_init(&item->task_list_node);
 		hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
@@ -3152,8 +3155,6 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	}
 	printk("------BURST LIST END-------");
 
-	/* release process reference to bfqq */
-	bfq_put_queue(bfqq);
 }
 
 static bool bfq_allow_bio_merge(struct request_queue *q, struct request *rq,
