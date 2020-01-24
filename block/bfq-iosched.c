@@ -3145,14 +3145,10 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	 */
 	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
 	{
-		hlist_del_init(&item->task_list_node);
 		hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
+		hlist_del_init(&item->task_list_node);
 		//printk(KERN_CONT "%lu, ",(unsigned long)&item->pid);
 	}
-	
-	/* release process reference to bfqq */
-	bfq_put_queue(bfqq);
-
 	printk("------BURST LIST START (%i)-------\n", bfqq_process_refs(new_bfqq));
 	hlist_for_each_entry_safe(item, n, &new_bfqq->task_list, task_list_node) 
 	{
@@ -3160,6 +3156,8 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	}
 	printk("------BURST LIST END-------");
 
+	/* release process reference to bfqq */
+	bfq_put_queue(bfqq);
 
 }
 
