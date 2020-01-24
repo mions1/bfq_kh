@@ -3152,7 +3152,7 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 		hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
 		//printk(KERN_CONT "%lu, ",(unsigned long)&item->pid);
 	}
-	printk("------BURST LIST START (%i)-------\n", bfqq->allocated+new_bfqq->allocated);
+	printk("------BURST LIST START (%i) (%i)-------\n", bfqq->allocated+new_bfqq->allocated, bfqq_process_refs(new_bfqq));
 	hlist_for_each_entry_safe(item, n, &new_bfqq->task_list, task_list_node) 
 	{
 		printk(KERN_CONT "%lu, ",(unsigned long)&item->pid);
