@@ -3132,16 +3132,14 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	 * delete task_list_node from one list to add it to another list
 	 * to merge two task_list into one
 	 */
-	if (bfqq_process_refs(bfqq) > 1) {
-		printk("%i ------BURST LIST START-------", bfqq_process_refs(bfqq));
-		hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
-		{
-			hlist_del_init(&item->task_list_node);
-			hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
-			printk("%i",(item->pid));
-		}
-		printk("------BURST LIST END-------");
+	printk("------BURST LIST START-------");
+	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
+	{
+		hlist_del_init(&item->task_list_node);
+		hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
+		printk(KERN_CONT "%i",(item->pid));
 	}
+	printk("------BURST LIST END-------");
 
 	/* release process reference to bfqq */
 	bfq_put_queue(bfqq);
@@ -5544,10 +5542,6 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	// struct hlist_node *n;
 	// bool task_found = false;
 
-	if (hlist_unhashed(&current->task_list_node)) {
-		printk("LISTA UNASHED, PID: %d", current->pid);
-	}
-
 	if (bfqq == bfqd->in_service_queue) {
 		__bfq_bfqq_expire(bfqd, bfqq, BFQQE_BUDGET_TIMEOUT);
 		bfq_schedule_dispatch(bfqd);
@@ -6780,14 +6774,12 @@ bfq_split_bfqq(struct bfq_io_cq *bic, struct bfq_queue *bfqq)
 	}
 
 	// TODO lista pid dopo split
-	if (bfqq_process_refs(bfqq) > 0) {
-		printk("------BURST LIST START AFTER SPLIT-------");
-		hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
-		{
-			printk("%i",(item->pid));
-		}
-		printk("------BURST LIST END-------");
+	printk("------BURST LIST START AFTER SPLIT-------");
+	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
+	{
+		printk(KERN_CONT "%i",(item->pid));
 	}
+	printk("------BURST LIST END-------");
 
 	bic_set_bfqq(bic, NULL, 1);
 
