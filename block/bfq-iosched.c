@@ -3132,7 +3132,7 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	 * delete task_list_node from one list to add it to another list
 	 * to merge two task_list into one
 	 */
-	printk("------BURST LIST START-------\n");
+	printk("------BURST LIST START (%i)-------\n", bfqq->allocated);
 	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
 	{
 		hlist_del_init(&item->task_list_node);
