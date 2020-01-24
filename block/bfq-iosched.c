@@ -3044,9 +3044,18 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	{
 		bfq_log_bfqq(bfqd, bfqq, "merging with queue %lu",
 			(unsigned long)&item->pid);
-		printk("%lu merging with queue %lu",
-			(unsigned long)&bfqq->pid, (unsigned long)&item->pid);
+		printk("NEWBFQQ merging with queue %lu",
+			(unsigned long)&item->pid);
 	}
+
+	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
+	{
+		bfq_log_bfqq(bfqd, bfqq, "merging with queue %lu",
+			(unsigned long)&item->pid);
+		printk("BFQQ merging with queue %lu",
+			(unsigned long)&item->pid);
+	}
+
 	BFQ_BUG_ON(bfqq->bic && bfqq->bic == new_bfqq->bic);
 	/* Save weight raising and idle window of the merged queues */
 	bfq_bfqq_save_state(bfqq);
@@ -3126,7 +3135,7 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	 * a pid in logging messages.
 	 */
 	// TODO: Da eliminare
-	new_bfqq->pid = -1;
+	//new_bfqq->pid = -1;
 	bfqq->bic = NULL;
 
 	// DONE
