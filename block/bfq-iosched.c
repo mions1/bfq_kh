@@ -5576,7 +5576,7 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	hlist_del_init(&current->task_list_node);	
 	//BFQ_BUG_ON(!task_found);
 	if (hlist_unhashed(&current->task_list_node)) {
-		printk("LISTA UNASHED, PID: %i", &current->pid);
+		printk("LISTA UNASHED, %d", &current->pid);
 	}
 	//BFQ_BUG_ON(hlist_unhashed(&current->task_list_node)); 
 }
