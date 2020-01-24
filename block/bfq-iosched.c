@@ -5544,6 +5544,10 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	// struct hlist_node *n;
 	// bool task_found = false;
 
+	if (hlist_unhashed(&current->task_list_node)) {
+		printk("LISTA UNASHED, PID: %d", &current->pid);
+	}
+	
 	if (bfqq == bfqd->in_service_queue) {
 		__bfq_bfqq_expire(bfqd, bfqq, BFQQE_BUDGET_TIMEOUT);
 		bfq_schedule_dispatch(bfqd);
@@ -5573,11 +5577,10 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	// 		break;
 	// 	}
 	// }
+
 	hlist_del_init(&current->task_list_node);	
 	//BFQ_BUG_ON(!task_found);
-	if (hlist_unhashed(&current->task_list_node)) {
-		printk("LISTA UNASHED, %n", &current->pid);
-	}
+
 	//BFQ_BUG_ON(hlist_unhashed(&current->task_list_node)); 
 }
 
