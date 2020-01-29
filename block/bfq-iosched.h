@@ -1084,6 +1084,17 @@ static inline void bfq_pid_to_str(int pid, char *str, int len, struct bfq_queue 
 
 		snprintf(str, len, "SHARED-");
 	//}
+
+	/*
+	ssize_t num_char = 0;
+	num_char += sprintf(str + num_char, "SHARED-:\n");
+	hlist_for_each_entry(item, &bfqq->task_list, task_list_node) {
+		num_char += sprintf(str + num_char,
+				    "%d, ",
+				    item->pid);
+	}
+	*/
+
 }
 
 #ifdef CONFIG_BFQ_REDIRECT_TO_CONSOLE
