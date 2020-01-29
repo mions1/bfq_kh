@@ -598,15 +598,10 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 	if (rb_link)
 		*rb_link = p;
 
-	if (bfqq != NULL && &bfqq->task_list != NULL) {
-		hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
-		{
-			// TODO controlla se va
-			BFQ_BUG_ON(item == 0 || item == NULL); 
-			bfq_log(bfqd, "%llu: returning %n",
-				(unsigned long long) sector,
-				bfqq ? item->pid : 0);
-		}
+	if (bfqq != NULL) {
+		bfq_log(bfqd, "%llu: returning %n",
+			(unsigned long long) sector,
+			bfqq ? item->pid : 0);
 	}
 	return bfqq;
 }
@@ -2792,7 +2787,7 @@ bfq_setup_merge(struct bfq_queue *bfqq, struct bfq_queue *new_bfqq)
 	if (process_refs == 0 || new_process_refs == 0)
 		return NULL;
 
-	hlist_for_each_entry_safe(item, n, &new_bfqq->task_list, task_list_node)
+	hlist_for_each_entry(item, &new_bfqq->task_list, task_list_node)
 	{
 		bfq_log_bfqq(bfqq->bfqd, bfqq, "scheduling merge with queue %d",
 			item->pid);
@@ -3076,7 +3071,7 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 
 		new_bfqq->entity.prio_changed = 1;
 	
-		hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
+		hlist_for_each_entry(item, &bfqq->task_list, task_list_node)
 		{
 			bfq_log_bfqq(bfqd, new_bfqq,
 					"wr start after merge with %d, rais_max_time %u",
@@ -4997,12 +4992,9 @@ check_queue:
 		    icq_to_bic(async_bfqq->next_rq->elv.icq) == bfqq->bic &&
 		    bfq_serv_to_charge(async_bfqq->next_rq, async_bfqq) <=
 		    bfq_bfqq_budget_left(async_bfqq)) {
-			hlist_for_each_entry_safe(item, n, &bfqq->bic->bfqq[0]->task_list, task_list_node)
-			{
 				bfq_log_bfqq(bfqd, bfqq,
 						"choosing directly the async queue %d",
 						item->pid);
-			}
 			BUG_ON(bfqq->bic->bfqq[0] == bfqq);
 			bfqq = bfqq->bic->bfqq[0];
 			bfq_log_bfqq(bfqd, bfqq,
@@ -6782,7 +6774,7 @@ bfq_split_bfqq(struct bfq_io_cq *bic, struct bfq_queue *bfqq)
 	// TODO lista pid dopo split
 	if (bfqq_process_refs(bfqq) > 0) {
 		printk("------BURST LIST START AFTER SPLIT-------");
-		hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
+		hlist_for_each_entry(item, &bfqq->task_list, task_list_node) 
 		{
 			printk("%i",(item->pid));
 		}

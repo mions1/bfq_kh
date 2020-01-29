@@ -1058,7 +1058,7 @@ void bfq_add_bfqq_busy(struct bfq_data *bfqd, struct bfq_queue *bfqq);
 /* --------------- end of interface of B-WF2Q+ ---------------- */
 
 /* Logging facilities. */
-static inline void bfq_pid_to_str(int pid, char *str, int len, struct bfq_queue *bfqq)
+static inline void bfq_pid_to_str(int pid, char *str, int len, bfq_queue *bfqq)
 {
 	struct task_struct *item;
 
@@ -1084,8 +1084,6 @@ static const char *checked_dev_name(const struct device *dev)
 
 	return nodev;
 }
-
-	//
 
 #ifdef CONFIG_BFQ_GROUP_IOSCHED
 
