@@ -1062,13 +1062,27 @@ static inline void bfq_pid_to_str(int pid, char *str, int len, struct bfq_queue 
 {
 	struct task_struct *item;
 
-	if (pid != -1)
-		snprintf(str, len, "%d", pid);
-	else {
-
+	//if (pid != -1)
+	//	snprintf(str, len, "%d", pid);
+	//else {
+		hlist_for_each_entry(item, &bfqq->task_list, task_list_node)
+		{
+			char *pid_char = (char *)item->pid;
+			int i = 0;
+			intj = 0;
+			while (str[i] != '\0') {
+				i++;
+			}
+			while (pid_char[j] != '\0') {
+				str[i] = pid_char[j];
+				i++; 
+				j++;
+			}
+			str[i] = '\0';
+		}
 
 		snprintf(str, len, "SHARED-");
-	}
+	//}
 }
 
 #ifdef CONFIG_BFQ_REDIRECT_TO_CONSOLE
