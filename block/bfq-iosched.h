@@ -1069,7 +1069,7 @@ static inline void bfq_pid_to_str(int pid, char *str, int len, struct bfq_queue 
 		{
 			char *pid_char = (char *)item->pid;
 			int i = 0;
-			intj = 0;
+			int j = 0;
 			while (str[i] != '\0') {
 				i++;
 			}
