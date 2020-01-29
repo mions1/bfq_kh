@@ -1061,10 +1061,10 @@ void bfq_add_bfqq_busy(struct bfq_data *bfqd, struct bfq_queue *bfqq);
 static inline void bfq_pid_to_str(int pid, char *str, int len, struct bfq_queue *bfqq)
 {
 	struct task_struct *item;
-
-	//if (pid != -1)
-	//	snprintf(str, len, "%d", pid);
-	//else {
+	
+	if (pid != -1)
+		snprintf(str, len, "%d", pid);
+	else {
 		hlist_for_each_entry(item, &bfqq->task_list, task_list_node)
 		{
 			char *pid_char = (char *)item->pid;
@@ -1083,8 +1083,8 @@ static inline void bfq_pid_to_str(int pid, char *str, int len, struct bfq_queue 
 		}
 
 		snprintf(str, len, "SHARED-");
-	//}
-
+	}
+	
 	/*
 	ssize_t num_char = 0;
 	num_char += sprintf(str + num_char, "SHARED-:\n");
