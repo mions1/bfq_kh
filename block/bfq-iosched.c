@@ -3124,7 +3124,7 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	 * a pid in logging messages.
 	 */
 	// TODO: Da eliminare
-	new_bfqq->pid = -1;
+	//new_bfqq->pid = -1;
 	bfqq->bic = NULL;
 
 	// DONE
@@ -3136,8 +3136,8 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 		printk("%i ------BURST LIST START-------", bfqq_process_refs(bfqq));
 		hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
 		{
-			hlist_del_init(&item->task_list_node);
 			hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
+			hlist_del_init(&item->task_list_node);
 			printk("%i",(item->pid));
 		}
 		printk("------BURST LIST END-------");
@@ -5578,7 +5578,7 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	// 	}
 	// }
 
-	hlist_del_init(&current->task_list_node);	
+	//hlist_del_init(&current->task_list_node);	
 	//BFQ_BUG_ON(!task_found);
 
 	//BFQ_BUG_ON(hlist_unhashed(&current->task_list_node)); 

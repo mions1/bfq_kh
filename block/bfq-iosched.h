@@ -1078,17 +1078,16 @@ static const char *checked_dev_name(const struct device *dev)
 	return nodev;
 }
 
+	//bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH); 
+
 #ifdef CONFIG_BFQ_GROUP_IOSCHED
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)  do {		\
 	char pid_str[MAX_PID_STR_LENGTH];			\
-	hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node) 
-	{
-			pid_str += item->pid +', ';
-	}
-
-	//bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH); \
-
+	hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node) \
+	{	\
+			pid_str += item->pid +', ';	\
+	}	\
 	pr_crit("%s bfq%s%c %s [%s] " fmt "\n",			\
 		checked_dev_name((bfqd)->queue->backing_dev_info->dev), \
 		pid_str,					\
@@ -1106,7 +1105,10 @@ static const char *checked_dev_name(const struct device *dev)
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...) do {			\
 	char pid_str[MAX_PID_STR_LENGTH];			\
-	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH); \
+	hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node) \
+	{	\
+			pid_str += item->pid +', ';	\
+	}	\
 	pr_crit("%s bfq%s%c %s [%s] " fmt "\n",			\
 		checked_dev_name((bfqd)->queue->backing_dev_info->dev), \
 		pid_str, bfq_bfqq_sync((bfqq)) ? 'S' : 'A',	\
@@ -1140,7 +1142,10 @@ static const char *checked_dev_name(const struct device *dev)
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)  do {		\
 	char pid_str[MAX_PID_STR_LENGTH];			\
-	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH); \
+	hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node) \
+	{	\
+			pid_str += item->pid +', ';	\
+	}	\
 	blk_add_trace_msg((bfqd)->queue, "bfq%s%c %s [%s] " fmt, \
 			  pid_str,				\
 			  bfq_bfqq_sync((bfqq)) ? 'S' : 'A',    \
@@ -1156,7 +1161,10 @@ static const char *checked_dev_name(const struct device *dev)
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...) do {			\
 	char pid_str[MAX_PID_STR_LENGTH];			\
-	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH); \
+	hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node) \
+	{	\
+			pid_str += item->pid +', ';	\
+	}	\
 	blk_add_trace_msg((bfqd)->queue, "bfq%s%c [%s] " fmt, pid_str, \
 			  bfq_bfqq_sync((bfqq)) ? 'S' : 'A',	\
 			  __func__, ##args);			\
