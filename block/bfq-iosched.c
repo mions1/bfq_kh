@@ -2831,7 +2831,7 @@ static bool bfq_may_be_close_cooperator(struct bfq_queue *bfqq,
 	struct hlist_node *n;
 
 	if (bfq_too_late_for_merging(new_bfqq)) {
-		hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node)
+		hlist_for_each_entry(item, &new_bfqq->task_list, task_list_node)
 		{
 			bfq_log_bfqq(bfqq->bfqd, bfqq,
 					"too late for bfq%d to be merged",
@@ -3040,7 +3040,7 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	struct task_struct *item;
 	struct hlist_node *n;
 
-	hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node)
+	hlist_for_each_entry(item, &new_bfqq->task_list, task_list_node)
 	{
 		bfq_log_bfqq(bfqd, bfqq, "merging with queue %lu",
 			(unsigned long)item->pid);
@@ -5034,7 +5034,7 @@ check_queue:
 			BUG_ON(new_bfqq == bfqq);
 			if (new_bfqq) 
 			{
-				hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node)
+				hlist_for_each_entry(item, &new_bfqq->task_list, task_list_node)
 				{
 					bfq_log_bfqq(bfqd, bfqq,
 						"chosen the queue %d for injection",
@@ -7827,7 +7827,7 @@ pid_t bfq_get_first_task_pid(struct bfq_queue *bfqq)
 	struct task_struct *item;
 	struct hlist_node *n;
 
-	hlist_for_each_entry(item, n, &bfqq->task_list, task_list_node) {
+	hlist_for_each_entry(item, &bfqq->task_list, task_list_node) {
 		return item->pid;
 	}
 
