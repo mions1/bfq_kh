@@ -1141,7 +1141,6 @@ static const char *checked_dev_name(const struct device *dev)
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)  do {		\
 	char pid_str[MAX_PID_STR_LENGTH];			\
 	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH); \
-	for 
 	blk_add_trace_msg((bfqd)->queue, "bfq%s%c %s [%s] " fmt, \
 			  pid_str,				\
 			  bfq_bfqq_sync((bfqq)) ? 'S' : 'A',    \
