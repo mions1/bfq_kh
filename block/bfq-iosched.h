@@ -23,7 +23,9 @@
 #define BFQ_DEFAULT_GRP_IOPRIO	0
 #define BFQ_DEFAULT_GRP_CLASS	IOPRIO_CLASS_BE
 
-#define MAX_PID_STR_LENGTH 12
+//#define MAX_PID_STR_LENGTH 12
+// Modified to allow pid list
+#define MAX_PID_STR_LENGTH 100
 
 /*
  * Soft real-time applications are extremely more latency sensitive
@@ -1080,7 +1082,13 @@ static const char *checked_dev_name(const struct device *dev)
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)  do {		\
 	char pid_str[MAX_PID_STR_LENGTH];			\
-	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH); \
+	hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node) 
+	{
+			pid_str += item->pid +', ';
+	}
+
+	//bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH); \
+
 	pr_crit("%s bfq%s%c %s [%s] " fmt "\n",			\
 		checked_dev_name((bfqd)->queue->backing_dev_info->dev), \
 		pid_str,					\
@@ -1133,6 +1141,7 @@ static const char *checked_dev_name(const struct device *dev)
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)  do {		\
 	char pid_str[MAX_PID_STR_LENGTH];			\
 	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH); \
+	for 
 	blk_add_trace_msg((bfqd)->queue, "bfq%s%c %s [%s] " fmt, \
 			  pid_str,				\
 			  bfq_bfqq_sync((bfqq)) ? 'S' : 'A',    \

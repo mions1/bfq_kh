@@ -605,7 +605,7 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 			BFQ_BUG_ON(item == 0 || item == NULL); 
 			bfq_log(bfqd, "%llu: returning %n",
 				(unsigned long long) sector,
-				bfqq ? &item->pid : 0);
+				bfqq ? item->pid : 0);
 		}
 	}
 	return bfqq;
@@ -2795,7 +2795,7 @@ bfq_setup_merge(struct bfq_queue *bfqq, struct bfq_queue *new_bfqq)
 	hlist_for_each_entry_safe(item, n, &new_bfqq->task_list, task_list_node)
 	{
 		bfq_log_bfqq(bfqq->bfqd, bfqq, "scheduling merge with queue %d",
-			&item->pid);
+			item->pid);
 	}
 
 	/*
@@ -2831,11 +2831,11 @@ static bool bfq_may_be_close_cooperator(struct bfq_queue *bfqq,
 	struct hlist_node *n;
 
 	if (bfq_too_late_for_merging(new_bfqq)) {
-		hlist_for_each_entry_safe(item, n, &new_bfqq->task_list, task_list_node)
+		hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node)
 		{
 			bfq_log_bfqq(bfqq->bfqd, bfqq,
 					"too late for bfq%d to be merged",
-					&item->pid);
+					item->pid);
 		}
 		return false;
 	}
@@ -3040,22 +3040,11 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	struct task_struct *item;
 	struct hlist_node *n;
 
-	hlist_for_each_entry_safe(item, n, &new_bfqq->task_list, task_list_node)
+	hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node)
 	{
 		bfq_log_bfqq(bfqd, bfqq, "merging with queue %lu",
-			(unsigned long)&item->pid);
-		printk("NEWBFQQ merging with queue %lu",
-			(unsigned long)&item->pid);
+			(unsigned long)item->pid);
 	}
-
-	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
-	{
-		bfq_log_bfqq(bfqd, bfqq, "merging with queue %lu",
-			(unsigned long)&item->pid);
-		printk("BFQQ merging with queue %lu",
-			(unsigned long)&item->pid);
-	}
-
 	BFQ_BUG_ON(bfqq->bic && bfqq->bic == new_bfqq->bic);
 	/* Save weight raising and idle window of the merged queues */
 	bfq_bfqq_save_state(bfqq);
@@ -3091,7 +3080,7 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 		{
 			bfq_log_bfqq(bfqd, new_bfqq,
 					"wr start after merge with %d, rais_max_time %u",
-					&item->pid,
+					item->pid,
 					jiffies_to_msecs(bfqq->wr_cur_max_time));
 		}
 	}
@@ -3137,30 +3126,25 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	// TODO: Da eliminare
 	new_bfqq->pid = -1;
 	bfqq->bic = NULL;
-	/* release process reference to bfqq */
-	bfq_put_queue(bfqq);
+
 	// DONE
 	/*
 	 * delete task_list_node from one list to add it to another list
 	 * to merge two task_list into one
 	 */
-	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
-	{
-		hlist_del_init(&item->task_list_node);
-		hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
-		//printk(KERN_CONT "%lu, ",(unsigned long)&item->pid);
+	if (bfqq_process_refs(bfqq) > 1) {
+		printk("%i ------BURST LIST START-------", bfqq_process_refs(bfqq));
+		hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
+		{
+			hlist_del_init(&item->task_list_node);
+			hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
+			printk("%i",(item->pid));
+		}
+		printk("------BURST LIST END-------");
 	}
-	
-	printk("------BURST LIST START (%i)-------\n", bfqq_process_refs(new_bfqq));
-	hlist_for_each_entry_safe(item, n, &new_bfqq->task_list, task_list_node) 
-	{
-		printk(KERN_CONT "%lu, ",(unsigned long)item->pid);
-	}
-	printk("------BURST LIST END-------");
-	
 
-
-
+	/* release process reference to bfqq */
+	bfq_put_queue(bfqq);
 }
 
 static bool bfq_allow_bio_merge(struct request_queue *q, struct request *rq,
@@ -5017,7 +5001,7 @@ check_queue:
 			{
 				bfq_log_bfqq(bfqd, bfqq,
 						"choosing directly the async queue %d",
-						&item->pid);
+						item->pid);
 			}
 			BUG_ON(bfqq->bic->bfqq[0] == bfqq);
 			bfqq = bfqq->bic->bfqq[0];
@@ -5050,11 +5034,11 @@ check_queue:
 			BUG_ON(new_bfqq == bfqq);
 			if (new_bfqq) 
 			{
-				hlist_for_each_entry_safe(item, n, &new_bfqq->task_list, task_list_node)
+				hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node)
 				{
 					bfq_log_bfqq(bfqd, bfqq,
 						"chosen the queue %d for injection",
-						&item->pid);
+						item->pid);
 				}
 			}
 			bfqq = new_bfqq;
@@ -5560,6 +5544,10 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	// struct hlist_node *n;
 	// bool task_found = false;
 
+	if (hlist_unhashed(&current->task_list_node)) {
+		printk("LISTA UNASHED, PID: %d", &current->pid);
+	}
+	
 	if (bfqq == bfqd->in_service_queue) {
 		__bfq_bfqq_expire(bfqd, bfqq, BFQQE_BUDGET_TIMEOUT);
 		bfq_schedule_dispatch(bfqd);
@@ -6792,14 +6780,15 @@ bfq_split_bfqq(struct bfq_io_cq *bic, struct bfq_queue *bfqq)
 	}
 
 	// TODO lista pid dopo split
-	/*
-	printk("------BURST LIST START AFTER SPLIT-------\n");
-	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
-	{
-		printk(KERN_CONT "%i, ",(item->pid));
+	if (bfqq_process_refs(bfqq) > 0) {
+		printk("------BURST LIST START AFTER SPLIT-------");
+		hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
+		{
+			printk("%i",(item->pid));
+		}
+		printk("------BURST LIST END-------");
 	}
-	printk("------BURST LIST END-------");
-	*/
+
 	bic_set_bfqq(bic, NULL, 1);
 
 	bfq_put_cooperator(bfqq);
@@ -7838,8 +7827,8 @@ pid_t bfq_get_first_task_pid(struct bfq_queue *bfqq)
 	struct task_struct *item;
 	struct hlist_node *n;
 
-	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) {
-		return &item->pid;
+	hlist_for_each_entry(item, n, &bfqq->task_list, task_list_node) {
+		return item->pid;
 	}
 
 	return 0;
