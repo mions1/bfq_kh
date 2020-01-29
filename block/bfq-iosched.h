@@ -9,7 +9,6 @@
 #include <linux/blktrace_api.h>
 #include <linux/hrtimer.h>
 #include <linux/blk-cgroup.h>
-#include <string.h>
 
 #define BFQ_IOPRIO_CLASSES	3
 #define BFQ_CL_IDLE_TIMEOUT	(HZ/5)
@@ -1068,8 +1067,19 @@ static inline void bfq_pid_to_str(int pid, char *str, int len, struct bfq_queue 
 	else {
 		hlist_for_each_entry(item, &bfqq->task_list, task_list_node)
 		{
-			strcat(str, (char *)item->pid);
+			char *pid_char = (char *)item->pid;
+			int i = j = 0;
+			while (str[i] != '\0') {
+				i++;
+			}
+			while (pid_char[j] != '\0') {
+				str[i] = pid_char[j];
+				i++; 
+				j++;
+			}
+			str[i] = '\0';
 		}
+
 		snprintf(str, len, "SHARED-");
 	}
 }
