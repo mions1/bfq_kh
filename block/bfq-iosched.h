@@ -1058,12 +1058,19 @@ void bfq_add_bfqq_busy(struct bfq_data *bfqd, struct bfq_queue *bfqq);
 /* --------------- end of interface of B-WF2Q+ ---------------- */
 
 /* Logging facilities. */
-static inline void bfq_pid_to_str(int pid, char *str, int len)
+static inline void bfq_pid_to_str(int pid, char *str, int len, struct bfq_queue *bfqq)
 {
+	struct task_struct *item;
+
 	if (pid != -1)
 		snprintf(str, len, "%d", pid);
-	else
+	else {
+		hlist_for_each_entry(item, &bfqq->task_list, task_list_node)
+		{
+				str += item->pid +', ';
+		}
 		snprintf(str, len, "SHARED-");
+	}
 }
 
 #ifdef CONFIG_BFQ_REDIRECT_TO_CONSOLE
@@ -1078,16 +1085,13 @@ static const char *checked_dev_name(const struct device *dev)
 	return nodev;
 }
 
-	//bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH); 
+	//
 
 #ifdef CONFIG_BFQ_GROUP_IOSCHED
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)  do {		\
 	char pid_str[MAX_PID_STR_LENGTH];			\
-	hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node) \
-	{	\
-			pid_str += item->pid +', ';	\
-	}	\
+	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH, bfqq); \
 	pr_crit("%s bfq%s%c %s [%s] " fmt "\n",			\
 		checked_dev_name((bfqd)->queue->backing_dev_info->dev), \
 		pid_str,					\
@@ -1105,10 +1109,7 @@ static const char *checked_dev_name(const struct device *dev)
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...) do {			\
 	char pid_str[MAX_PID_STR_LENGTH];			\
-	hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node) \
-	{	\
-			pid_str += item->pid +', ';	\
-	}	\
+	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH, bfqq); \
 	pr_crit("%s bfq%s%c %s [%s] " fmt "\n",			\
 		checked_dev_name((bfqd)->queue->backing_dev_info->dev), \
 		pid_str, bfq_bfqq_sync((bfqq)) ? 'S' : 'A',	\
@@ -1142,10 +1143,7 @@ static const char *checked_dev_name(const struct device *dev)
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)  do {		\
 	char pid_str[MAX_PID_STR_LENGTH];			\
-	hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node) \
-	{	\
-			pid_str += item->pid +', ';	\
-	}	\
+	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH, bfqq); \
 	blk_add_trace_msg((bfqd)->queue, "bfq%s%c %s [%s] " fmt, \
 			  pid_str,				\
 			  bfq_bfqq_sync((bfqq)) ? 'S' : 'A',    \
@@ -1161,10 +1159,7 @@ static const char *checked_dev_name(const struct device *dev)
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...) do {			\
 	char pid_str[MAX_PID_STR_LENGTH];			\
-	hlist_for_each_entry(item, n, &new_bfqq->task_list, task_list_node) \
-	{	\
-			pid_str += item->pid +', ';	\
-	}	\
+	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH, bfqq); \
 	blk_add_trace_msg((bfqd)->queue, "bfq%s%c [%s] " fmt, pid_str, \
 			  bfq_bfqq_sync((bfqq)) ? 'S' : 'A',	\
 			  __func__, ##args);			\
