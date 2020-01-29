@@ -1068,7 +1068,8 @@ static inline void bfq_pid_to_str(int pid, char *str, int len, struct bfq_queue 
 		hlist_for_each_entry(item, &bfqq->task_list, task_list_node)
 		{
 			char *pid_char = (char *)item->pid;
-			int i = j = 0;
+			int i = 0;
+			int j = 0;
 			while (str[i] != '\0') {
 				i++;
 			}
