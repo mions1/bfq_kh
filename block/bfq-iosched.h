@@ -1065,10 +1065,10 @@ static inline void bfq_pid_to_str(int pid, char *str, int len, struct bfq_queue 
 	if (pid != -1)
 		snprintf(str, len, "%d", pid);
 	else {
-		hlist_for_each_entry(item, &bfqq->task_list, task_list_node)
-		{
-				str += item->pid +', ';
-		}
+		//hlist_for_each_entry(item, &bfqq->task_list, task_list_node)
+		//{
+		//		str += item->pid +', ';
+		//}
 		snprintf(str, len, "SHARED-");
 	}
 }
