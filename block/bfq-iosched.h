@@ -1095,8 +1095,6 @@ static const char *checked_dev_name(const struct device *dev)
 	return nodev;
 }
 
-	//
-
 #ifdef CONFIG_BFQ_GROUP_IOSCHED
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)  do {		\
