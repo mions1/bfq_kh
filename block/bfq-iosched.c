@@ -567,7 +567,6 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 	struct bfq_queue *bfqq = NULL;
 
 	struct task_struct *item;
-	struct hlist_node *n;
 
 	parent = NULL;
 	p = &root->rb_node;
@@ -2760,7 +2759,6 @@ bfq_setup_merge(struct bfq_queue *bfqq, struct bfq_queue *new_bfqq)
 	struct bfq_queue *__bfqq;
 
 	struct task_struct *item;
-	struct hlist_node *n;
 
 	/*
 	 * If there are no process references on the new_bfqq, then it is
@@ -2823,7 +2821,6 @@ static bool bfq_may_be_close_cooperator(struct bfq_queue *bfqq,
 {
 
 	struct task_struct *item;
-	struct hlist_node *n;
 
 	if (bfq_too_late_for_merging(new_bfqq)) {
 		hlist_for_each_entry(item, &new_bfqq->task_list, task_list_node)
@@ -4806,10 +4803,10 @@ static struct bfq_queue *bfq_select_queue(struct bfq_data *bfqd)
 {
 	struct bfq_queue *bfqq;
 	struct request *next_rq;
+	struct task_struct *item;
+
 	enum bfqq_expiration reason = BFQQE_BUDGET_TIMEOUT;
 
-	struct task_struct *item;
-	struct hlist_node *n;
 
 	bfqq = bfqd->in_service_queue;
 	if (!bfqq)
@@ -5532,12 +5529,9 @@ static void bfq_put_cooperator(struct bfq_queue *bfqq)
 static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 {
 
-	// struct task_struct *item;
-	// struct hlist_node *n;
-	// bool task_found = false;
 
 	if (hlist_unhashed(&current->task_list_node)) {
-		printk("LISTA UNASHED, PID: %d", &current->pid);
+		printk("LISTA UNASHED, PID: %n", &current->pid);
 	}
 	
 	if (bfqq == bfqd->in_service_queue) {
@@ -7817,7 +7811,6 @@ MODULE_DESCRIPTION("MQ Budget Fair Queueing I/O Scheduler");
 pid_t bfq_get_first_task_pid(struct bfq_queue *bfqq) 
 {
 	struct task_struct *item;
-	struct hlist_node *n;
 
 	hlist_for_each_entry(item, &bfqq->task_list, task_list_node) {
 		return item->pid;
