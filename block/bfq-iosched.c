@@ -7757,13 +7757,5 @@ MODULE_DESCRIPTION("MQ Budget Fair Queueing I/O Scheduler");
 /* get the pid of the first task in task_list of bfqq */
 pid_t bfq_get_first_task_pid(struct bfq_queue *bfqq) 
 {
-	struct task_struct *item;
-
-	return bfqq->task_list.first;
-
-	hlist_for_each_entry(item, &bfqq->task_list, task_list_node) {
-		return item->pid;
-	}
-
-	return 0;
+	return (hlist_entry_safe((&bfqq->task_list)->first, struct task_struct, task_list_node)->pid);
 }
