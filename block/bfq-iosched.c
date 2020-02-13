@@ -566,8 +566,6 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 	struct rb_node **p, *parent;
 	struct bfq_queue *bfqq = NULL;
 
-	struct task_struct *item;
-
 	parent = NULL;
 	p = &root->rb_node;
 	
@@ -600,7 +598,7 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 	if (bfqq != NULL) {
 		bfq_log(bfqd, "%llu: returning %n",
 			(unsigned long long) sector,
-			bfqq ? item->pid : 0);
+			bfqq ? bfq_get_first_task_pid(bfqq) : 0);
 	}
 	return bfqq;
 }
@@ -2758,8 +2756,6 @@ bfq_setup_merge(struct bfq_queue *bfqq, struct bfq_queue *new_bfqq)
 	int process_refs, new_process_refs;
 	struct bfq_queue *__bfqq;
 
-	struct task_struct *item;
-
 	/*
 	 * If there are no process references on the new_bfqq, then it is
 	 * unsafe to follow the ->new_bfqq chain as other bfqq's in the chain
@@ -2785,12 +2781,8 @@ bfq_setup_merge(struct bfq_queue *bfqq, struct bfq_queue *new_bfqq)
 	if (process_refs == 0 || new_process_refs == 0)
 		return NULL;
 
-	hlist_for_each_entry(item, &new_bfqq->task_list, task_list_node)
-	{
-		bfq_log_bfqq(bfqq->bfqd, bfqq, "scheduling merge with queue %d",
-			item->pid);
-	}
-
+	bfq_log_bfqq(bfqq->bfqd, bfqq, "scheduling merge with queue %d",
+		bfq_get_first_task_pid(bfqq));
 	/*
 	 * Merging is just a redirection: the requests of the process
 	 * owning one of the two queues are redirected to the other queue.
@@ -2820,15 +2812,11 @@ static bool bfq_may_be_close_cooperator(struct bfq_queue *bfqq,
 					struct bfq_queue *new_bfqq)
 {
 
-	struct task_struct *item;
-
 	if (bfq_too_late_for_merging(new_bfqq)) {
-		hlist_for_each_entry(item, &new_bfqq->task_list, task_list_node)
-		{
-			bfq_log_bfqq(bfqq->bfqd, bfqq,
-					"too late for bfq%d to be merged",
-					item->pid);
-		}
+
+		bfq_log_bfqq(bfqq->bfqd, bfqq,
+				"too late for bfq%d to be merged",
+				bfq_get_first_task_pid(bfqq));
 		return false;
 	}
 
@@ -3032,11 +3020,8 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	struct task_struct *item;
 	struct hlist_node *n;
 
-	hlist_for_each_entry(item, &new_bfqq->task_list, task_list_node)
-	{
-		bfq_log_bfqq(bfqd, bfqq, "merging with queue %lu",
-			(unsigned long)item->pid);
-	}
+	bfq_log_bfqq(bfqd, bfqq, "merging with queue %d",
+		bfq_get_first_task_pid(bfqq));
 	BFQ_BUG_ON(bfqq->bic && bfqq->bic == new_bfqq->bic);
 	/* Save weight raising and idle window of the merged queues */
 	bfq_bfqq_save_state(bfqq);
@@ -3068,13 +3053,10 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 
 		new_bfqq->entity.prio_changed = 1;
 	
-		hlist_for_each_entry(item, &bfqq->task_list, task_list_node)
-		{
-			bfq_log_bfqq(bfqd, new_bfqq,
-					"wr start after merge with %d, rais_max_time %u",
-					item->pid,
-					jiffies_to_msecs(bfqq->wr_cur_max_time));
-		}
+		bfq_log_bfqq(bfqd, new_bfqq,
+				"wr start after merge with %d, rais_max_time %u",
+				bfq_get_first_task_pid(bfqq),
+				jiffies_to_msecs(bfqq->wr_cur_max_time));
 	}
 
 	if (bfqq->wr_coeff > 1) { /* bfqq has given its wr to new_bfqq */
@@ -4795,7 +4777,6 @@ static struct bfq_queue *bfq_select_queue(struct bfq_data *bfqd)
 {
 	struct bfq_queue *bfqq;
 	struct request *next_rq;
-	struct task_struct *item;
 
 	enum bfqq_expiration reason = BFQQE_BUDGET_TIMEOUT;
 
@@ -4983,7 +4964,7 @@ check_queue:
 		    bfq_bfqq_budget_left(async_bfqq)) {
 				bfq_log_bfqq(bfqd, bfqq,
 						"choosing directly the async queue %d",
-						item->pid);
+						bfq_get_first_task_pid(bfqq));
 			BUG_ON(bfqq->bic->bfqq[0] == bfqq);
 			bfqq = bfqq->bic->bfqq[0];
 			bfq_log_bfqq(bfqd, bfqq,
@@ -5015,12 +4996,11 @@ check_queue:
 			BUG_ON(new_bfqq == bfqq);
 			if (new_bfqq) 
 			{
-				hlist_for_each_entry(item, &new_bfqq->task_list, task_list_node)
-				{
-					bfq_log_bfqq(bfqd, bfqq,
-						"chosen the queue %d for injection",
-						item->pid);
-				}
+
+				bfq_log_bfqq(bfqd, bfqq,
+					"chosen the queue %d for injection",
+					bfq_get_first_task_pid(new_bfqq));
+
 			}
 			bfqq = new_bfqq;
 		} else {
@@ -7759,11 +7739,8 @@ pid_t bfq_get_first_task_pid(struct bfq_queue *bfqq)
 {
 	struct task_struct *item;
 
-	return bfqq->task_list.first;
+	if ((&bfqq->task_list)->first != NULL)
+		return (hlist_entry_safe( (&bfqq->task_list)->first, typeof(*(item)), task_list_node))->pid;
 
-	hlist_for_each_entry(item, &bfqq->task_list, task_list_node) {
-		return item->pid;
-	}
-
-	return 0;
+	return 0;	
 }

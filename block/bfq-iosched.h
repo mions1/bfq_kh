@@ -25,7 +25,7 @@
 
 //#define MAX_PID_STR_LENGTH 12
 // Increased max_pid_str_length to allow print of all pid in a shared list
-#define MAX_PID_STR_LENGTH 200
+#define MAX_PID_STR_LENGTH 100
 
 /*
  * Soft real-time applications are extremely more latency sensitive
@@ -1060,10 +1060,12 @@ static inline void bfq_pid_to_str(char *str, int len, struct bfq_queue *bfqq)
 	struct task_struct *item;
 	ssize_t num_char = 0;
 
-	num_char += sprintf(str + num_char, "PID(s): ");
+	num_char += sprintf(str + num_char, "PIDs: ");
 	hlist_for_each_entry(item, &bfqq->task_list, task_list_node) {
+		if (num_char > 60)
+			return;
 		num_char += sprintf(str + num_char,
-					"%d, ",
+					"%d,",
 					item->pid);
 	}
 }
