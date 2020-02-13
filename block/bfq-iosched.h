@@ -10,6 +10,8 @@
 #include <linux/hrtimer.h>
 #include <linux/blk-cgroup.h>
 
+#include "blk-cgroup-rwstat.h"
+
 #define BFQ_IOPRIO_CLASSES	3
 #define BFQ_CL_IDLE_TIMEOUT	(HZ/5)
 
@@ -23,9 +25,7 @@
 #define BFQ_DEFAULT_GRP_IOPRIO	0
 #define BFQ_DEFAULT_GRP_CLASS	IOPRIO_CLASS_BE
 
-//#define MAX_PID_STR_LENGTH 12
-// Increased max_pid_str_length to allow print of all pid in a shared list
-#define MAX_PID_STR_LENGTH 100
+#define MAX_PID_STR_LENGTH 256
 
 /*
  * Soft real-time applications are extremely more latency sensitive
@@ -150,7 +150,7 @@ struct bfq_entity {
 	 * Flag, true if the entity is on a tree (either the active or
 	 * the idle one of its service_tree) or is in service.
 	 */
-	bool on_st;
+	bool on_st_or_in_serv;
 
 	/* B-WF2Q+ start and finish timestamps [sectors/weight] */
 	u64 start, finish;
@@ -170,6 +170,9 @@ struct bfq_entity {
 	/* budget, used also to calculate F_i: F_i = S_i + @budget / @weight */
 	int budget;
 
+	/* device weight, if non-zero, it overrides the default weight of
+	 * bfq_group_data */
+	int dev_weight;
 	/* weight of the queue */
 	int weight;
 	/* next weight if a change is in progress */
@@ -307,6 +310,9 @@ struct bfq_queue {
 
 	/* list of task in queue */
 	struct hlist_head task_list;
+	
+	/* pid of the process owning the queue, used for logging purposes */
+	pid_t pid;
 
 	/*
 	 * Pointer to the bfq_io_cq owning the bfq_queue, set to %NULL
@@ -814,6 +820,9 @@ struct bfq_stat {
 };
 
 struct bfqg_stats {
+	/* basic stats */
+	struct blkg_rwstat		bytes;
+	struct blkg_rwstat		ios;
 #ifdef CONFIG_BFQ_CGROUP_DEBUG
 	/* number of ios merged */
 	struct blkg_rwstat		merged;
@@ -921,6 +930,7 @@ struct bfq_group {
 
 #else
 struct bfq_group {
+	struct bfq_entity entity;
 	struct bfq_sched_data sched_data;
 
 	struct bfq_queue *async_bfqq[2][IOPRIO_BE_NR];
@@ -962,6 +972,7 @@ pid_t bfq_get_first_task_pid(struct bfq_queue *queue);
 
 /* ---------------- cgroups-support interface ---------------- */
 
+void bfqg_stats_update_legacy_io(struct request_queue *q, struct request *rq);
 void bfqg_stats_update_io_add(struct bfq_group *bfqg, struct bfq_queue *bfqq,
 			      unsigned int op);
 void bfqg_stats_update_io_remove(struct bfq_group *bfqg, unsigned int op);
@@ -984,6 +995,7 @@ struct bfq_group *bfq_find_set_group(struct bfq_data *bfqd,
 struct blkcg_gq *bfqg_to_blkg(struct bfq_group *bfqg);
 struct bfq_group *bfqq_group(struct bfq_queue *bfqq);
 struct bfq_group *bfq_create_group_hierarchy(struct bfq_data *bfqd, int node);
+void bfqg_and_blkg_get(struct bfq_group *bfqg);
 void bfqg_and_blkg_put(struct bfq_group *bfqg);
 
 #ifdef CONFIG_BFQ_GROUP_IOSCHED
@@ -1055,17 +1067,14 @@ void bfq_add_bfqq_busy(struct bfq_data *bfqd, struct bfq_queue *bfqq);
 /* --------------- end of interface of B-WF2Q+ ---------------- */
 
 /* Logging facilities. */
-static inline void bfq_pid_to_str(char *str, int len, struct bfq_queue *bfqq)
+static inline void bfq_pid_to_str(int pid, char *str, int len)
 {
 	struct task_struct *item;
 	ssize_t num_char = 0;
 
-	num_char += sprintf(str + num_char, "PIDs: ");
-	hlist_for_each_entry(item, &bfqq->task_list, task_list_node) {
-		if (num_char > 60)
-			return;
+	hlist_for_each_entry(item, &bfqq->task_list, task_list_node, struct bfq_queue *bfqq) {
 		num_char += sprintf(str + num_char,
-					"%d,",
+					"%d-",
 					item->pid);
 	}
 }
@@ -1086,7 +1095,9 @@ static const char *checked_dev_name(const struct device *dev)
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)  do {		\
 	char pid_str[MAX_PID_STR_LENGTH];			\
-	bfq_pid_to_str(pid_str, MAX_PID_STR_LENGTH, bfqq); \
+	if (likely(!blk_trace_note_message_enabled((bfqd)->queue)))	\
+		break;							\
+	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH, bfqq); \
 	pr_crit("%s bfq%s%c %s [%s] " fmt "\n",			\
 		checked_dev_name((bfqd)->queue->backing_dev_info->dev), \
 		pid_str,					\
@@ -1104,7 +1115,9 @@ static const char *checked_dev_name(const struct device *dev)
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...) do {			\
 	char pid_str[MAX_PID_STR_LENGTH];			\
-	bfq_pid_to_str(pid_str, MAX_PID_STR_LENGTH, bfqq); \
+	if (likely(!blk_trace_note_message_enabled((bfqd)->queue)))	\
+		break;							\
+	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH, bfqq); \
 	pr_crit("%s bfq%s%c %s [%s] " fmt "\n",			\
 		checked_dev_name((bfqd)->queue->backing_dev_info->dev), \
 		pid_str, bfq_bfqq_sync((bfqq)) ? 'S' : 'A',	\
@@ -1138,7 +1151,9 @@ static const char *checked_dev_name(const struct device *dev)
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...)  do {		\
 	char pid_str[MAX_PID_STR_LENGTH];			\
-	bfq_pid_to_str(pid_str, MAX_PID_STR_LENGTH, bfqq); \
+	if (likely(!blk_trace_note_message_enabled((bfqd)->queue)))	\
+		break;							\
+	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH, bfqq); \
 	blk_add_trace_msg((bfqd)->queue, "bfq%s%c %s [%s] " fmt, \
 			  pid_str,				\
 			  bfq_bfqq_sync((bfqq)) ? 'S' : 'A',    \
@@ -1146,6 +1161,8 @@ static const char *checked_dev_name(const struct device *dev)
 	} while (0)
 
 #define bfq_log_bfqg(bfqd, bfqg, fmt, args...)  do {                    \
+	if (likely(!blk_trace_note_message_enabled((bfqd)->queue)))	\
+		break;							\
 	blk_add_trace_msg((bfqd)->queue, "%s [%s] " fmt, bfqg->blkg_path, \
 				  __func__, ##args);			\
 	} while (0)
@@ -1154,7 +1171,9 @@ static const char *checked_dev_name(const struct device *dev)
 
 #define bfq_log_bfqq(bfqd, bfqq, fmt, args...) do {			\
 	char pid_str[MAX_PID_STR_LENGTH];			\
-	bfq_pid_to_str(pid_str, MAX_PID_STR_LENGTH, bfqq); \
+	if (likely(!blk_trace_note_message_enabled((bfqd)->queue)))	\
+		break;							\
+	bfq_pid_to_str((bfqq)->pid, pid_str, MAX_PID_STR_LENGTH, bfqq); \
 	blk_add_trace_msg((bfqd)->queue, "bfq%s%c [%s] " fmt, pid_str, \
 			  bfq_bfqq_sync((bfqq)) ? 'S' : 'A',	\
 			  __func__, ##args);			\
@@ -1163,8 +1182,11 @@ static const char *checked_dev_name(const struct device *dev)
 
 #endif /* CONFIG_BFQ_GROUP_IOSCHED */
 
-#define bfq_log(bfqd, fmt, args...)					\
-	blk_add_trace_msg((bfqd)->queue, "bfq [%s] " fmt, __func__, ##args)
+#define bfq_log(bfqd, fmt, args...)  do {				\
+	if (likely(!blk_trace_note_message_enabled((bfqd)->queue)))	\
+		break;							\
+	blk_add_trace_msg((bfqd)->queue, "bfq [%s] " fmt, __func__, ##args); \
+	} while (0)
 
 #endif /* CONFIG_BLK_DEV_IO_TRACE */
 #endif /* CONFIG_BFQ_REDIRECT_TO_CONSOLE */

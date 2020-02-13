@@ -568,7 +568,6 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 
 	parent = NULL;
 	p = &root->rb_node;
-	
 	while (*p) {
 		struct rb_node **n;
 
@@ -590,16 +589,15 @@ bfq_rq_pos_tree_lookup(struct bfq_data *bfqd, struct rb_root *root,
 		bfqq = NULL;
 	}
 
-
 	*ret_parent = parent;
 	if (rb_link)
 		*rb_link = p;
 
-	if (bfqq != NULL) {
-		bfq_log(bfqd, "%llu: returning %n",
+	if (bfqq != NULL)
+		bfq_log(bfqd, "%llu: returning %d",
 			(unsigned long long) sector,
 			bfqq ? bfq_get_first_task_pid(bfqq) : 0);
-	}
+
 	return bfqq;
 }
 
@@ -628,6 +626,10 @@ bfq_pos_tree_add_move(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 		rb_erase(&bfqq->pos_node, bfqq->pos_root);
 		bfqq->pos_root = NULL;
 	}
+
+	/* oom_bfqq does not participate in queue merging */
+	if (bfqq == &bfqd->oom_bfqq)
+		return;
 
 	/*
 	 * bfqq cannot be merged any longer (see comments in
@@ -1140,7 +1142,6 @@ bfq_bfqq_resume_state(struct bfq_queue *bfqq, struct bfq_data *bfqd,
 	}
 }
 
-/* Returns how many refs a bfqq has without i/o refs */
 static int bfqq_process_refs(struct bfq_queue *bfqq)
 {
 	int process_refs, io_refs;
@@ -1148,7 +1149,7 @@ static int bfqq_process_refs(struct bfq_queue *bfqq)
 	lockdep_assert_held(&bfqq->bfqd->lock);
 
 	io_refs = bfqq->allocated;
-	process_refs = bfqq->ref - io_refs - bfqq->entity.on_st -
+	process_refs = bfqq->ref - io_refs - bfqq->entity.on_st_or_in_serv -
 		(bfqq->weight_counter != NULL);
 	BFQ_BUG_ON(process_refs < 0);
 	return process_refs;
@@ -2782,7 +2783,8 @@ bfq_setup_merge(struct bfq_queue *bfqq, struct bfq_queue *new_bfqq)
 		return NULL;
 
 	bfq_log_bfqq(bfqq->bfqd, bfqq, "scheduling merge with queue %d",
-		bfq_get_first_task_pid(bfqq));
+		bfq_get_first_task_pid(new_bfqq));
+
 	/*
 	 * Merging is just a redirection: the requests of the process
 	 * owning one of the two queues are redirected to the other queue.
@@ -2811,12 +2813,10 @@ bfq_setup_merge(struct bfq_queue *bfqq, struct bfq_queue *new_bfqq)
 static bool bfq_may_be_close_cooperator(struct bfq_queue *bfqq,
 					struct bfq_queue *new_bfqq)
 {
-
 	if (bfq_too_late_for_merging(new_bfqq)) {
-
 		bfq_log_bfqq(bfqq->bfqd, bfqq,
-				"too late for bfq%d to be merged",
-				bfq_get_first_task_pid(bfqq));
+			     "too late for bfq%d to be merged",
+				bfq_get_first_task_pid(new_bfqq));
 		return false;
 	}
 
@@ -3013,6 +3013,28 @@ static void bfq_bfqq_save_state(struct bfq_queue *bfqq)
 		     bfqq->wr_cur_max_time);
 }
 
+
+static
+void bfq_release_process_ref(struct bfq_data *bfqd, struct bfq_queue *bfqq)
+{
+	/*
+	 * To prevent bfqq's service guarantees from being violated,
+	 * bfqq may be left busy, i.e., queued for service, even if
+	 * empty (see comments in __bfq_bfqq_expire() for
+	 * details). But, if no process will send requests to bfqq any
+	 * longer, then there is no point in keeping bfqq queued for
+	 * service. In addition, keeping bfqq queued for service, but
+	 * with no process ref any longer, may have caused bfqq to be
+	 * freed when dequeued from service. But this is assumed to
+	 * never happen.
+	 */
+	if (bfq_bfqq_busy(bfqq) && RB_EMPTY_ROOT(&bfqq->sort_list) &&
+	    bfqq != bfqd->in_service_queue)
+		bfq_del_bfqq_busy(bfqd, bfqq, false);
+
+	bfq_put_queue(bfqq);
+}
+
 static void
 bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 		struct bfq_queue *bfqq, struct bfq_queue *new_bfqq)
@@ -3020,8 +3042,11 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	struct task_struct *item;
 	struct hlist_node *n;
 
-	bfq_log_bfqq(bfqd, bfqq, "merging with queue %d",
-		bfq_get_first_task_pid(bfqq));
+	bfq_log_bfqq(bfqd, bfqq, "merging with queue %lu",
+		(unsigned long)bfq_get_first_task_pid(new_bfqq));
+
+	BFQ_BUG_ON(new_bfqq == &bfqd->oom_bfqq);
+
 	BFQ_BUG_ON(bfqq->bic && bfqq->bic == new_bfqq->bic);
 	/* Save weight raising and idle window of the merged queues */
 	bfq_bfqq_save_state(bfqq);
@@ -3052,11 +3077,10 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 		}
 
 		new_bfqq->entity.prio_changed = 1;
-	
 		bfq_log_bfqq(bfqd, new_bfqq,
-				"wr start after merge with %d, rais_max_time %u",
-				bfq_get_first_task_pid(bfqq),
-				jiffies_to_msecs(bfqq->wr_cur_max_time));
+			     "wr start after merge with %d, rais_max_time %u",
+			     bfq_get_first_task_pid(bfqq),
+			     jiffies_to_msecs(bfqq->wr_cur_max_time));
 	}
 
 	if (bfqq->wr_coeff > 1) { /* bfqq has given its wr to new_bfqq */
@@ -3098,19 +3122,17 @@ bfq_merge_bfqqs(struct bfq_data *bfqd, struct bfq_io_cq *bic,
 	 * a pid in logging messages.
 	 */
 	bfqq->bic = NULL;
-
 	/*
 	 * delete task_list_node from one list to add it to another list
 	 * to merge two task_list into one
 	 */
-	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
-	{
+	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) {
 		hlist_del_init(&item->task_list_node);
 		hlist_add_head(&item->task_list_node, &new_bfqq->task_list);
 	}
-
 	/* release process reference to bfqq */
 	bfq_put_queue(bfqq);
+	bfq_release_process_ref(bfqd, bfqq);
 }
 
 static bool bfq_allow_bio_merge(struct request_queue *q, struct request *rq,
@@ -3141,6 +3163,8 @@ static bool bfq_allow_bio_merge(struct request_queue *q, struct request *rq,
 	 */
 	new_bfqq = bfq_setup_cooperator(bfqd, bfqq, bio, false);
 	BFQ_BUG_ON(new_bfqq == bfqq);
+	BFQ_BUG_ON(new_bfqq == &bfqd->oom_bfqq);
+
 	if (new_bfqq) {
 		/*
 		 * bic still points to bfqq, then it has not yet been
@@ -3831,11 +3855,17 @@ static void bfq_dispatch_remove(struct request_queue *q, struct request *rq)
 static bool idling_needed_for_service_guarantees(struct bfq_data *bfqd,
 						 struct bfq_queue *bfqq)
 {
-	bool asymmetric_scenario = (bfqq->wr_coeff > 1 &&
-		(bfqd->wr_busy_queues <
-		 bfq_tot_busy_queues(bfqd) ||
-		 bfqd->rq_in_driver >=
-		 bfqq->dispatched + 4)) ||
+	bool asymmetric_scenario;
+
+	/* No point in idling for bfqq if it won't get requests any longer */
+	if (unlikely(!bfqq_process_refs(bfqq)))
+		return false;
+
+	asymmetric_scenario = (bfqq->wr_coeff > 1 &&
+			       (bfqd->wr_busy_queues <
+				bfq_tot_busy_queues(bfqd) ||
+				bfqd->rq_in_driver >=
+				bfqq->dispatched + 4)) ||
 		bfq_asymmetric_scenario(bfqd, bfqq);
 
 	bfq_log_bfqq(bfqd, bfqq,
@@ -3889,6 +3919,8 @@ static bool __bfq_bfqq_expire(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 
 		bfq_del_bfqq_busy(bfqd, bfqq, true);
 	} else {
+		BFQ_BUG_ON(RB_EMPTY_ROOT(&bfqq->sort_list) &&
+			   !bfqq_process_refs(bfqq));
 		bfq_requeue_bfqq(bfqd, bfqq, true);
 		/*
 		 * Resort priority tree of potential close cooperators.
@@ -4509,6 +4541,10 @@ static bool idling_boosts_thr_without_issues(struct bfq_data *bfqd,
 		bfqq_sequential_and_IO_bound,
 		idling_boosts_thr;
 
+	/* No point in idling for bfqq if it won't get requests any longer */
+	if (unlikely(!bfqq_process_refs(bfqq)))
+		return false;
+
 	bfqq_sequential_and_IO_bound = !BFQQ_SEEKY(bfqq) &&
 		bfq_bfqq_IO_bound(bfqq) && bfq_bfqq_has_short_ttime(bfqq);
 
@@ -4606,6 +4642,10 @@ static bool bfq_better_to_idle(struct bfq_queue *bfqq)
 {
 	struct bfq_data *bfqd = bfqq->bfqd;
 	bool idling_boosts_thr_with_no_issue, idling_needed_for_service_guar;
+
+	/* No point in idling for bfqq if it won't get requests any longer */
+	if (unlikely(!bfqq_process_refs(bfqq)))
+		return false;
 
 	if (unlikely(bfqd->strict_guarantees))
 		return true;
@@ -4777,9 +4817,7 @@ static struct bfq_queue *bfq_select_queue(struct bfq_data *bfqd)
 {
 	struct bfq_queue *bfqq;
 	struct request *next_rq;
-
 	enum bfqq_expiration reason = BFQQE_BUDGET_TIMEOUT;
-
 
 	bfqq = bfqd->in_service_queue;
 	if (!bfqq)
@@ -4962,9 +5000,9 @@ check_queue:
 		    icq_to_bic(async_bfqq->next_rq->elv.icq) == bfqq->bic &&
 		    bfq_serv_to_charge(async_bfqq->next_rq, async_bfqq) <=
 		    bfq_bfqq_budget_left(async_bfqq)) {
-				bfq_log_bfqq(bfqd, bfqq,
-						"choosing directly the async queue %d",
-						bfq_get_first_task_pid(bfqq));
+			bfq_log_bfqq(bfqd, bfqq,
+				     "choosing directly the async queue %d",
+				     bfq_get_first_task_pid(bfqq->bic->bfqq[0]));
 			BUG_ON(bfqq->bic->bfqq[0] == bfqq);
 			bfqq = bfqq->bic->bfqq[0];
 			bfq_log_bfqq(bfqd, bfqq,
@@ -4994,14 +5032,10 @@ check_queue:
 				     !bfq_bfqq_has_short_ttime(bfqq));
 			new_bfqq = bfq_choose_bfqq_for_injection(bfqd);
 			BUG_ON(new_bfqq == bfqq);
-			if (new_bfqq) 
-			{
-
+			if (new_bfqq)
 				bfq_log_bfqq(bfqd, bfqq,
 					"chosen the queue %d for injection",
 					bfq_get_first_task_pid(new_bfqq));
-
-			}
 			bfqq = new_bfqq;
 		} else {
 			bfqq = NULL;
@@ -5385,9 +5419,7 @@ void bfq_put_queue(struct bfq_queue *bfqq)
 {
 	struct bfq_queue *item;
 	struct hlist_node *n;
-#ifdef CONFIG_BFQ_GROUP_IOSCHED
 	struct bfq_group *bfqg = bfqq_group(bfqq);
-#endif
 
 	assert_spin_locked(&bfqq->bfqd->lock);
 
@@ -5404,7 +5436,7 @@ void bfq_put_queue(struct bfq_queue *bfqq)
 	BFQ_BUG_ON(bfqq->allocated != 0);
 	BFQ_BUG_ON(bfqq->entity.tree);
 	BFQ_BUG_ON(bfq_bfqq_busy(bfqq));
-	BFQ_BUG_ON(bfqq->entity.on_st);
+	BFQ_BUG_ON(bfqq->entity.on_st_or_in_serv);
 	BFQ_BUG_ON(bfqq->weight_counter != NULL);
 
 	if (!hlist_unhashed(&bfqq->burst_list_node)) {
@@ -5471,8 +5503,8 @@ void bfq_put_queue(struct bfq_queue *bfqq)
 
 #ifdef CONFIG_BFQ_GROUP_IOSCHED
 	bfq_log_bfqq(bfqq->bfqd, bfqq, "putting blkg and bfqg %p\n", bfqg);
-	bfqg_and_blkg_put(bfqg);
 #endif
+	bfqg_and_blkg_put(bfqg);
 	if (bfqq->bfqd)
 		bfq_log_bfqq(bfqq->bfqd, bfqq, "%p freed", bfqq);
 
@@ -5500,7 +5532,6 @@ static void bfq_put_cooperator(struct bfq_queue *bfqq)
 
 static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 {
-	
 	if (bfqq == bfqd->in_service_queue) {
 		__bfq_bfqq_expire(bfqd, bfqq, BFQQE_BUDGET_TIMEOUT);
 		bfq_schedule_dispatch(bfqd);
@@ -5510,7 +5541,7 @@ static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 
 	bfq_put_cooperator(bfqq);
 
-	bfq_put_queue(bfqq); /* release process reference */
+	bfq_release_process_ref(bfqd, bfqq);
 }
 
 static void bfq_exit_icq_bfqq(struct bfq_io_cq *bic, bool is_sync)
@@ -5614,8 +5645,7 @@ static void bfq_check_ioprio_change(struct bfq_io_cq *bic, struct bio *bio)
 
 	bfqq = bic_to_bfqq(bic, false);
 	if (bfqq) {
-		/* release process reference on this queue */
-		bfq_put_queue(bfqq);
+		bfq_release_process_ref(bfqd, bfqq);
 		bfqq = bfq_get_queue(bfqd, bio, BLK_RW_ASYNC, bic);
 		bic_set_bfqq(bic, bfqq, false);
 		bfq_log_bfqq(bfqd, bfqq,
@@ -5638,7 +5668,6 @@ static void bfq_init_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 	INIT_HLIST_HEAD(&bfqq->woken_list);
 	INIT_HLIST_HEAD(&bfqq->task_list);
 	INIT_HLIST_NODE(&current->task_list_node);
-
 	BFQ_BUG_ON(!hlist_unhashed(&bfqq->burst_list_node));
 
 	bfqq->ref = 0;
@@ -5666,9 +5695,7 @@ static void bfq_init_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 
 	bfq_mark_bfqq_IO_bound(bfqq);
 
-	/*
-	 * Add current task to task_list in bfqq
-	*/
+	/* add current task to task_list in bfqq */
 	hlist_add_head(&current->task_list_node, &bfqq->task_list);
 
 	/* Tentative initial value to trade off between thr and lat */
@@ -6010,6 +6037,7 @@ static bool __bfq_insert_request(struct bfq_data *bfqd, struct request *rq)
 		*new_bfqq = bfq_setup_cooperator(bfqd, bfqq, rq, true);
 	bool waiting, idle_timer_disabled = false;
 	BFQ_BUG_ON(!bfqq);
+	BFQ_BUG_ON(new_bfqq == &bfqd->oom_bfqq);
 
 	assert_spin_locked(&bfqd->lock);
 	bfq_log_bfqq(bfqd, bfqq, "rq %p bfqq %p", rq, bfqq);
@@ -6112,6 +6140,10 @@ static void bfq_insert_request(struct blk_mq_hw_ctx *hctx, struct request *rq,
 	bool idle_timer_disabled = false;
 	unsigned int cmd_flags;
 
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	if (!cgroup_subsys_on_dfl(io_cgrp_subsys) && rq->bio)
+		bfqg_stats_update_legacy_io(q, rq);
+#endif
 	spin_lock_irq(&bfqd->lock);
 	if (blk_mq_sched_try_insert_merge(q, rq)) {
 		spin_unlock_irq(&bfqd->lock);
@@ -6597,7 +6629,7 @@ static void bfq_finish_requeue_request(struct request *rq)
 	BFQ_BUG_ON(!bfqd);
 
 	if (rq->rq_flags & RQF_DISP_LIST) {
-		pr_crit("putting disp rq %p for %d", rq, bfq_get_first_task_pid(bfqq));
+		pr_crit("putting disp rq %p for %d", rq, bfqq->pid);
 		BUG();
 	}
 
@@ -6672,6 +6704,8 @@ static void bfq_finish_requeue_request(struct request *rq)
 }
 
 /*
+ * Removes the association between the current task and bfqq, assuming
+ * that bic points to the bfq iocontext of the task.
  * Returns NULL if a new bfqq should be allocated, or the old bfqq if this
  * was the last process referring to that bfqq.
  */
@@ -6684,29 +6718,23 @@ bfq_split_bfqq(struct bfq_io_cq *bic, struct bfq_queue *bfqq)
 	bfq_log_bfqq(bfqq->bfqd, bfqq, "splitting queue");
 
 	if (bfqq_process_refs(bfqq) == 1) {
-		//bfqq->pid = current->pid;
 		bfq_clear_bfqq_coop(bfqq);
 		bfq_clear_bfqq_split_coop(bfqq);
 		return bfqq;
 	}
 
-	/*
-	 * delete current task from queue itereting on task_list
-	 */
-	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node) 
-	{
-		if (item == current)
-		{
+	/* delete current task from queue iterating on task_list */
+	hlist_for_each_entry_safe(item, n, &bfqq->task_list, task_list_node)
+		if (item == current) {
 			hlist_del_init(&item->task_list_node);
 			break;
 		}
-	}
 
 	bic_set_bfqq(bic, NULL, 1);
 
 	bfq_put_cooperator(bfqq);
 
-	bfq_put_queue(bfqq);
+	bfq_release_process_ref(bfqq->bfqd, bfqq);
 	return NULL;
 }
 
@@ -6865,6 +6893,7 @@ static struct bfq_queue *bfq_init_rq(struct request *rq)
 	if (likely(!new_queue)) {
 		/* If the queue was seeky for too long, break it apart. */
 		if (bfq_bfqq_coop(bfqq) && bfq_bfqq_split_coop(bfqq)) {
+			BFQ_BUG_ON(bfqq == &bfqd->oom_bfqq);
 			BFQ_BUG_ON(!is_sync);
 			bfq_log_bfqq(bfqd, bfqq, "breaking apart bfqq");
 
@@ -6883,7 +6912,6 @@ static struct bfq_queue *bfq_init_rq(struct request *rq)
 				bfqq_already_existing = true;
 
 			BFQ_BUG_ON(!bfqq);
-			BFQ_BUG_ON(bfqq == &bfqd->oom_bfqq);
 		}
 	}
 
@@ -7132,10 +7160,10 @@ static void bfq_exit_queue(struct elevator_queue *e)
 
 	BFQ_BUG_ON(hrtimer_active(&bfqd->idle_slice_timer));
 
-#ifdef CONFIG_BFQ_GROUP_IOSCHED
 	/* release oom-queue reference to root group */
 	bfqg_and_blkg_put(bfqd->root_group);
 
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
 	blkcg_deactivate_policy(bfqd->queue, &blkcg_policy_bfq);
 #else
 	spin_lock_irq(&bfqd->lock);
@@ -7163,36 +7191,6 @@ static void bfq_init_root_group(struct bfq_group *root_group,
 		root_group->sched_data.service_tree[i] = BFQ_SERVICE_TREE_INIT;
 	root_group->sched_data.bfq_class_idle_last_service = jiffies;
 }
-
-#if defined(CONFIG_BFQ_GROUP_IOSCHED) && defined(CONFIG_BLK_CGROUP_IOCOST)
-static bool bfq_enabled = false;
-
-static void bfq_enable(void)
-{
-	static DEFINE_MUTEX(bfq_enable_mutex);
-
-	mutex_lock(&bfq_enable_mutex);
-	if (!bfq_enabled) {
-		pr_info("bfq-iosched: Overriding iocost\n");
-		blkcg_policy_unregister(&blkcg_policy_iocost);
-		cgroup_add_dfl_cftypes(&io_cgrp_subsys, bfq_blkg_files);
-		bfq_enabled = true;
-	}
-	mutex_unlock(&bfq_enable_mutex);
-}
-
-static void __exit bfq_disable(void)
-{
-	if (bfq_enabled) {
-		pr_info("bfq-iosched: Restoring iocost\n");
-		cgroup_rm_cftypes(bfq_blkg_files);
-		blkcg_policy_register(&blkcg_policy_iocost);
-	}
-}
-#else
-static void bfq_enable(void) {}
-static void __exit bfq_disable(void) {}
-#endif
 
 static int bfq_init_queue(struct request_queue *q, struct elevator_type *e)
 {
@@ -7318,7 +7316,6 @@ static int bfq_init_queue(struct request_queue *q, struct elevator_type *e)
 	bfq_init_entity(&bfqd->oom_bfqq.entity, bfqd->root_group);
 
 	wbt_disable_default(q);
-	bfq_enable();
 	return 0;
 
 out_free:
@@ -7724,7 +7721,16 @@ static void __exit bfq_exit(void)
 	blkcg_policy_unregister(&blkcg_policy_bfq);
 #endif
 	bfq_slab_kill();
-	bfq_disable();
+}
+
+pid_t bfq_get_first_task_pid(struct bfq_queue *bfqq) 
+{
+	struct task_struct *item;
+
+	if ((&bfqq->task_list)->first != NULL)
+		return (hlist_entry_safe( (&bfqq->task_list)->first, typeof(*(item)), task_list_node))->pid;
+
+	return -1;	
 }
 
 module_init(bfq_init);
@@ -7733,14 +7739,3 @@ module_exit(bfq_exit);
 MODULE_AUTHOR("Paolo Valente");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MQ Budget Fair Queueing I/O Scheduler");
-
-/* get the pid of the first task in task_list of bfqq */
-pid_t bfq_get_first_task_pid(struct bfq_queue *bfqq) 
-{
-	struct task_struct *item;
-
-	if ((&bfqq->task_list)->first != NULL)
-		return (hlist_entry_safe( (&bfqq->task_list)->first, typeof(*(item)), task_list_node))->pid;
-
-	return 0;	
-}
